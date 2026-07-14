@@ -12,7 +12,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'Pharmacy Dispatch Portal',
-  description: 'Clearline HMO — medication prescription bid management',
+  description: 'Clearline HMO — Pharmacy aggregator dispatch management',
 }
 
 export default function RootLayout({
@@ -22,7 +22,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${GeistMono.variable} antialiased`}>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+        />
+      </head>
+      <body className={`${inter.variable} ${GeistMono.variable} font-sans antialiased bg-surface`}>
         {children}
       </body>
     </html>
