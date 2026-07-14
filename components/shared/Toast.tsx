@@ -16,9 +16,10 @@ export function Toast({ message, type = 'error', onDismiss }: ToastProps) {
   }, [onDismiss])
 
   const bg = type === 'error' ? 'bg-error' : 'bg-secondary'
+  const textColor = type === 'error' ? 'text-on-error' : 'text-on-secondary'
 
   return (
-    <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 ${bg} text-white px-4 py-3 rounded shadow-lg max-w-sm`}>
+    <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 ${bg} ${textColor} px-4 py-3 rounded shadow-lg max-w-sm`}>
       <p className="text-body-sm flex-1">{message}</p>
       <button
         onClick={onDismiss}

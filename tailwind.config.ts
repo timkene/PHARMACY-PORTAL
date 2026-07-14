@@ -19,6 +19,9 @@ const config: Config = {
         outline:      { DEFAULT: '#737780', variant: '#c3c6d1' },
         'on-surface': { DEFAULT: '#191c1e', variant: '#43474f' },
         error:        { DEFAULT: '#ba1a1a', container: '#ffdad6' },
+        'on-primary':   '#ffffff',
+        'on-secondary': '#ffffff',
+        'on-error':     '#ffffff',
       },
       fontFamily: {
         sans:  ['var(--font-inter)', 'Inter', 'sans-serif'],

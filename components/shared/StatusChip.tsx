@@ -2,7 +2,7 @@ type ChipStatus = 'active' | 'pending' | 'error' | 'info'
 
 const CHIP_CLASSES: Record<ChipStatus, string> = {
   active:  'bg-secondary/15 text-secondary',
-  pending: 'bg-amber-100 text-amber-700',
+  pending: 'bg-amber-500/15 text-amber-700',
   error:   'bg-error/15 text-error',
   info:    'bg-primary/15 text-primary',
 }

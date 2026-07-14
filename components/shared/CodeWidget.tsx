@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 
+const COPY_FEEDBACK_DELAY_MS = 2_000
+
 interface CodeWidgetProps {
   code: string
   label?: string
@@ -12,7 +14,7 @@ export function CodeWidget({ code, label = 'ACTIVE & SECURE' }: CodeWidgetProps)
   const copy = async () => {
     await navigator.clipboard.writeText(code)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), COPY_FEEDBACK_DELAY_MS)
   }
 
   return (
