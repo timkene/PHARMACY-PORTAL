@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 describe('apiFetch', () => {
   beforeEach(() => {
+    vi.resetModules()
     vi.stubGlobal('fetch', vi.fn())
   })
 
