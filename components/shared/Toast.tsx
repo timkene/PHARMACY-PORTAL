@@ -17,13 +17,14 @@ export function Toast({ message, type = 'error', onDismiss }: ToastProps) {
 
   const bg = type === 'error' ? 'bg-error' : 'bg-secondary'
   const textColor = type === 'error' ? 'text-on-error' : 'text-on-secondary'
+  const dismissColor = type === 'error' ? 'text-on-error/70 hover:text-on-error' : 'text-on-secondary/70 hover:text-on-secondary'
 
   return (
     <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 ${bg} ${textColor} px-4 py-3 rounded shadow-lg max-w-sm`}>
       <p className="text-body-sm flex-1">{message}</p>
       <button
         onClick={onDismiss}
-        className="text-white/70 hover:text-white text-lg leading-none"
+        className={`${dismissColor} text-lg leading-none`}
         aria-label="Dismiss"
       >
         ×
