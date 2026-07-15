@@ -1,10 +1,9 @@
 'use client'
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { aggregatorSignup, ApiError } from '@/lib/api'
-
-const INPUT_CLS = 'w-full border border-outline-variant rounded px-3 py-2 text-body-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20'
+import { INPUT_CLS } from '@/lib/styles'
 
 const FIELDS = [
   { label: 'Company Name', field: 'companyName' as const, type: 'text', placeholder: 'MedStore Nigeria Ltd' },
@@ -24,7 +23,7 @@ export default function AggregatorSignupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const update = (field: keyof typeof form) => (e: ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [field]: e.target.value }))
 
   const handleSubmit = async (e: FormEvent) => {
