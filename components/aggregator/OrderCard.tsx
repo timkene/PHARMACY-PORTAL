@@ -3,9 +3,11 @@ import { CountdownTimer } from '@/components/shared/CountdownTimer'
 import { MedicationTag } from '@/components/shared/MedicationTag'
 import type { Order } from '@/lib/types'
 
+const MAX_SHOWN_MEDICATIONS = 2
+
 export function OrderCard({ order }: { order: Order }) {
-  const shownMeds = order.medications.slice(0, 2)
-  const extra = order.medications.length - shownMeds.length
+  const shownMeds = order.medications.slice(0, MAX_SHOWN_MEDICATIONS)
+  const extra = order.medications.length - MAX_SHOWN_MEDICATIONS
 
   return (
     <div className="bg-surface-lowest border border-outline-variant rounded p-5 flex flex-col gap-4">
