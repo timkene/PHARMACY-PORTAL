@@ -2,6 +2,7 @@ export interface Medication {
   name: string
   dosage: string
   quantity: number
+  diagnosis: string
 }
 
 export interface Enrollee {
@@ -33,7 +34,7 @@ export interface Order {
   id: string
   intakeId: string
   enrollee: Enrollee
-  diagnosis: string
+  diagnosis?: string
   medications: Medication[]
   status: OrderStatus
   bids: Bid[]

@@ -83,7 +83,6 @@ export const logout = async () => {
 // Staff — Orders
 export const createOrder = (payload: {
   enrollee: Enrollee
-  diagnosis: string
   medications: Medication[]
 }) =>
   apiFetch<{ orderId: string }>('/api/orders', {

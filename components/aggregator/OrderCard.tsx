@@ -14,7 +14,9 @@ export function OrderCard({ order }: { order: Order }) {
       <div className="flex items-start justify-between">
         <div>
           <p className="font-mono text-code-mono text-on-surface-variant mb-1">{order.intakeId}</p>
-          <p className="text-body-sm text-on-surface">{order.diagnosis}</p>
+          <p className="text-body-sm text-on-surface">
+            {order.medications.map(m => m.diagnosis).filter(Boolean).join(' · ')}
+          </p>
         </div>
         <div className="text-right">
           <p className="text-label-caps text-on-surface-variant uppercase tracking-widest mb-0.5">Time Left</p>

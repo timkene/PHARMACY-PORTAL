@@ -75,7 +75,9 @@ export default function AggregatorOrderPage() {
         <div className="bg-surface-lowest border border-outline-variant rounded p-6">
           <p className="font-mono text-code-mono text-on-surface-variant mb-1">{order.intakeId}</p>
           <h1 className="text-title-md font-semibold text-on-surface mb-1">{order.enrollee.fullName}</h1>
-          <p className="text-body-sm text-on-surface-variant mb-3">{order.diagnosis}</p>
+          <p className="text-body-sm text-on-surface-variant mb-3">
+            {order.medications.map(m => m.diagnosis).filter(Boolean).join(' · ')}
+          </p>
           <div className="flex flex-wrap gap-2">
             {order.medications.map((med, i) => <MedicationTag key={i} med={med} />)}
           </div>

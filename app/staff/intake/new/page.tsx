@@ -21,7 +21,6 @@ export default function NewIntakePage() {
 
   const handleSubmit = async (data: {
     enrollee: Enrollee
-    diagnosis: string
     medications: Medication[]
   }) => {
     setSubmitting(true)

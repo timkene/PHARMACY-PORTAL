@@ -105,7 +105,9 @@ export default function StaffOrderPage() {
               <h1 className="text-title-md font-semibold text-on-surface">
                 {order.enrollee.fullName}
               </h1>
-              <p className="text-body-sm text-on-surface-variant">{order.diagnosis}</p>
+              <p className="text-body-sm text-on-surface-variant">
+                {order.medications.map(m => m.diagnosis).filter(Boolean).join(' · ')}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

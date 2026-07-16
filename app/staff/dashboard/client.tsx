@@ -127,7 +127,9 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
                         >
                           <td className="px-4 py-3 font-mono text-code-mono text-on-surface">{order.intakeId}</td>
                           <td className="px-4 py-3 text-body-sm text-on-surface">{order.enrollee.fullName}</td>
-                          <td className="px-4 py-3 text-body-sm text-on-surface-variant">{order.diagnosis}</td>
+                          <td className="px-4 py-3 text-body-sm text-on-surface-variant">
+                            {order.medications.map(m => m.diagnosis).filter(Boolean).join(', ') || order.diagnosis || '—'}
+                          </td>
                           <td className="px-4 py-3 text-body-sm text-on-surface-variant">{order.medications.length}</td>
                           <td className="px-4 py-3"><StatusChip status={chip.status} label={chip.label} /></td>
                           <td className="px-4 py-3 text-body-sm text-on-surface-variant">
