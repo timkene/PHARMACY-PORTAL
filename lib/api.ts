@@ -104,7 +104,7 @@ export const generateApproval = (id: string) =>
 
 // Aggregator
 export const getAggregatorDashboard = () =>
-  apiFetch<AggregatorDashboard>('/api/aggregator/orders')
+  apiFetch<AggregatorDashboard>('/api/aggregator/dashboard')
 
 export const placeBid = (orderId: string, unitPrice: number, totalPrice: number) =>
   apiFetch<{ bid: Bid }>(`/api/orders/${orderId}/bids`, {
