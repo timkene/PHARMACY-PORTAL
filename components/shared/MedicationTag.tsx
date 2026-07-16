@@ -7,9 +7,15 @@ interface MedicationTagProps {
 export function MedicationTag({ med }: MedicationTagProps) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container text-body-sm text-on-surface-variant border border-outline-variant">
-      {med.diagnosis && (
+      {med.diagnosisCode && (
         <>
-          <span className="text-primary font-semibold">{med.diagnosis}</span>
+          <span className="text-primary font-semibold font-mono">{med.diagnosisCode}</span>
+          <span className="text-outline-variant">·</span>
+        </>
+      )}
+      {med.procedureCode && (
+        <>
+          <span className="text-secondary font-semibold font-mono">{med.procedureCode}</span>
           <span className="text-outline-variant">·</span>
         </>
       )}

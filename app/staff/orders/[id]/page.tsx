@@ -101,13 +101,21 @@ export default function StaffOrderPage() {
             <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-title-md shrink-0">
               {order.enrollee.fullName.slice(0, 2).toUpperCase()}
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="text-title-md font-semibold text-on-surface">
                 {order.enrollee.fullName}
               </h1>
               <p className="text-body-sm text-on-surface-variant">
+                {order.enrollee.enrolleeId && (
+                  <span className="font-mono mr-2">{order.enrollee.enrolleeId}</span>
+                )}
                 {order.medications.map(m => m.diagnosis).filter(Boolean).join(' · ')}
               </p>
+              {order.provider && (
+                <p className="text-label-sm text-on-surface-variant mt-0.5">
+                  Provider: <span className="font-semibold text-on-surface">{order.provider.providerName}</span>
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

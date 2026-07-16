@@ -5,7 +5,7 @@ import { StaffShell } from '@/components/staff/StaffShell'
 import { IntakeForm } from '@/components/staff/IntakeForm'
 import { Toast } from '@/components/shared/Toast'
 import { createOrder, ApiError } from '@/lib/api'
-import type { Enrollee, Medication } from '@/lib/types'
+import type { Enrollee, Medication, Provider } from '@/lib/types'
 
 function generateIntakeId(): string {
   const n = Math.floor(10_000 + Math.random() * 90_000)
@@ -21,6 +21,7 @@ export default function NewIntakePage() {
 
   const handleSubmit = async (data: {
     enrollee: Enrollee
+    provider: Provider
     medications: Medication[]
   }) => {
     setSubmitting(true)

@@ -6,7 +6,9 @@ import type {
   OrderStatus,
   Enrollee,
   Medication,
+  Provider,
   AggregatorDashboard,
+  SearchResult,
 } from './types'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -83,6 +85,7 @@ export const logout = async () => {
 // Staff — Orders
 export const createOrder = (payload: {
   enrollee: Enrollee
+  provider: Provider
   medications: Medication[]
 }) =>
   apiFetch<{ orderId: string }>('/api/orders', {
@@ -116,3 +119,14 @@ export const verifyCollection = (orderId: string, collectionCode: string) =>
     method: 'POST',
     body: JSON.stringify({ collectionCode }),
   })
+
+// Search (MotherDuck-backed)
+const search = (path: string) => async (q: string): Promise<SearchResult[]> => {
+  const data = await apiFetch<{ results: SearchResult[] }>(`${path}?q=${encodeURIComponent(q)}`)
+  return data.results
+}
+
+export const searchMembers    = search('/api/search/members')
+export const searchProviders  = search('/api/search/providers')
+export const searchProcedures = search('/api/search/procedures')
+export const searchDiagnoses  = search('/api/search/diagnoses')

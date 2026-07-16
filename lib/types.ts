@@ -1,15 +1,20 @@
+export interface Enrollee {
+  enrolleeId: string
+  fullName: string
+}
+
+export interface Provider {
+  providerId: string
+  providerName: string
+}
+
 export interface Medication {
+  procedureCode?: string
   name: string
   dosage: string
   quantity: number
+  diagnosisCode?: string
   diagnosis: string
-}
-
-export interface Enrollee {
-  fullName: string
-  email: string
-  phone: string
-  address: string
 }
 
 export interface Bid {
@@ -34,6 +39,7 @@ export interface Order {
   id: string
   intakeId: string
   enrollee: Enrollee
+  provider?: Provider
   diagnosis?: string
   medications: Medication[]
   status: OrderStatus
@@ -89,4 +95,9 @@ export interface CollectionVerifiedEvent {
 
 export interface ApprovalGeneratedEvent {
   approvalCode: string
+}
+
+export interface SearchResult {
+  code: string
+  label: string
 }
