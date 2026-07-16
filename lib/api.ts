@@ -11,6 +11,16 @@ import type {
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
+function setDomainCookie(name: string, value: string) {
+  if (typeof document === 'undefined') return
+  document.cookie = `${name}=${value}; path=/; SameSite=Lax`
+}
+
+function clearDomainCookie(name: string) {
+  if (typeof document === 'undefined') return
+  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message)
@@ -30,32 +40,45 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 // Auth
-export const staffLogin = (email: string, password: string) =>
-  apiFetch<{ user: StaffUser }>('/api/auth/staff/login', {
+export const staffLogin = async (email: string, password: string) => {
+  const data = await apiFetch<{ user: StaffUser; session: string }>('/api/auth/staff/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   })
+  setDomainCookie('staff_session', data.session)
+  return data
+}
 
-export const aggregatorLogin = (email: string, password: string) =>
-  apiFetch<{ user: AggregatorUser }>('/api/auth/aggregator/login', {
+export const aggregatorLogin = async (email: string, password: string) => {
+  const data = await apiFetch<{ user: AggregatorUser; session: string }>('/api/auth/aggregator/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   })
+  setDomainCookie('aggregator_session', data.session)
+  return data
+}
 
-export const aggregatorSignup = (payload: {
+export const aggregatorSignup = async (payload: {
   companyName: string
   contactName: string
   email: string
   phone: string
   password: string
-}) =>
-  apiFetch<{ user: AggregatorUser }>('/api/auth/aggregator/signup', {
+}) => {
+  const data = await apiFetch<{ user?: AggregatorUser; session: string }>('/api/auth/aggregator/signup', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+  setDomainCookie('aggregator_session', data.session)
+  return data
+}
 
-export const logout = () =>
-  apiFetch<void>('/api/auth/logout', { method: 'POST' })
+export const logout = async () => {
+  const result = await apiFetch<void>('/api/auth/logout', { method: 'POST' })
+  clearDomainCookie('staff_session')
+  clearDomainCookie('aggregator_session')
+  return result
+}
 
 // Staff — Orders
 export const createOrder = (payload: {
