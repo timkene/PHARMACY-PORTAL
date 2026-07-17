@@ -96,8 +96,10 @@ export const createOrder = (payload: {
 export const getOrders = () =>
   apiFetch<{ orders: Order[] }>('/api/orders')
 
-export const getOrder = (id: string) =>
-  apiFetch<{ order: Order; bids: Bid[]; status: OrderStatus }>(`/api/orders/${id}`)
+export const getOrder = async (id: string): Promise<{ order: Order; bids: Bid[]; status: OrderStatus }> => {
+  const order = await apiFetch<Order>(`/api/orders/${id}`)
+  return { order, bids: order.bids ?? [], status: order.status }
+}
 
 export const generateApproval = (id: string) =>
   apiFetch<{ approvalCode: string }>(`/api/orders/${id}/generate-approval`, {
