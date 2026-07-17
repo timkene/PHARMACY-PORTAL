@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import type { Enrollee, Medication, Provider } from '@/lib/types'
+import type { Enrollee, Medication, MedicationFrequency, Provider } from '@/lib/types'
 import { SearchComboBox } from '@/components/shared/SearchComboBox'
 import {
   searchMembers,
@@ -15,11 +15,23 @@ interface IntakeFormProps {
   submitting: boolean
 }
 
+const FREQUENCY_OPTIONS: MedicationFrequency[] = [
+  'every 24 hrs',
+  'every 12 hrs',
+  'every 8 hrs',
+  'every 6 hrs',
+  'every week',
+  'every month',
+]
+
 const EMPTY_MED: Medication = {
   procedureCode: '',
   name: '',
   dosage: '',
   quantity: 1,
+  tablets: 1,
+  frequency: '',
+  durationDays: 1,
   diagnosisCode: '',
   diagnosis: '',
 }
@@ -64,6 +76,16 @@ export function IntakeForm({ onSubmit, submitting }: IntakeFormProps) {
     const missingDiag = filledMeds.findIndex(m => !m.diagnosis.trim())
     if (missingDiag !== -1) {
       setMedError(`Medication ${missingDiag + 1} is missing a diagnosis.`)
+      return
+    }
+    const missingFreq = filledMeds.findIndex(m => !m.frequency)
+    if (missingFreq !== -1) {
+      setMedError(`Medication ${missingFreq + 1} is missing a frequency.`)
+      return
+    }
+    const badDuration = filledMeds.findIndex(m => !m.durationDays || m.durationDays < 1)
+    if (badDuration !== -1) {
+      setMedError(`Medication ${badDuration + 1} needs a valid course duration.`)
       return
     }
     setMedError('')
@@ -202,6 +224,45 @@ export function IntakeForm({ onSubmit, submitting }: IntakeFormProps) {
                       placeholder="1"
                       value={med.quantity}
                       onChange={e => updateMed(idx, { quantity: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                {/* Tablets / Frequency / Duration row */}
+                <div className="grid grid-cols-[72px_1fr_96px] gap-2">
+                  <div>
+                    <label className="block text-label-sm text-on-surface-variant mb-1">Tablets</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className={INPUT_CLS}
+                      placeholder="1"
+                      value={med.tablets}
+                      onChange={e => updateMed(idx, { tablets: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-label-sm text-on-surface-variant mb-1">Frequency</label>
+                    <select
+                      className={INPUT_CLS}
+                      value={med.frequency}
+                      onChange={e => updateMed(idx, { frequency: e.target.value as MedicationFrequency })}
+                    >
+                      <option value="">Select…</option>
+                      {FREQUENCY_OPTIONS.map(f => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-label-sm text-on-surface-variant mb-1">Duration (days)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className={INPUT_CLS}
+                      placeholder="7"
+                      value={med.durationDays || ''}
+                      onChange={e => updateMed(idx, { durationDays: Number(e.target.value) })}
                     />
                   </div>
                 </div>

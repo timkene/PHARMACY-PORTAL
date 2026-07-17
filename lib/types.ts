@@ -8,11 +8,22 @@ export interface Provider {
   providerName: string
 }
 
+export type MedicationFrequency =
+  | 'every 24 hrs'
+  | 'every 12 hrs'
+  | 'every 8 hrs'
+  | 'every 6 hrs'
+  | 'every week'
+  | 'every month'
+
 export interface Medication {
   procedureCode?: string
   name: string
   dosage: string
   quantity: number
+  tablets: number
+  frequency: MedicationFrequency | ''
+  durationDays: number
   diagnosisCode?: string
   diagnosis: string
 }

@@ -19,7 +19,10 @@ export function MedicationTag({ med }: MedicationTagProps) {
           <span className="text-outline-variant">·</span>
         </>
       )}
-      {med.name} · {med.dosage} × {med.quantity}
+      {med.name} · {med.dosage}
+      {med.tablets != null && <> · {med.tablets} tab{med.tablets !== 1 ? 's' : ''}</>}
+      {med.frequency && <> · {med.frequency}</>}
+      {med.durationDays != null && med.durationDays > 0 && <> · {med.durationDays}d</>}
     </span>
   )
 }
