@@ -120,13 +120,21 @@ export const verifyCollection = (orderId: string, collectionCode: string) =>
     body: JSON.stringify({ collectionCode }),
   })
 
-// Search (MotherDuck-backed)
-const search = (path: string) => async (q: string): Promise<SearchResult[]> => {
-  const data = await apiFetch<{ results: SearchResult[] }>(`${path}?q=${encodeURIComponent(q)}`)
-  return data.results
+// Search — proxied through NHIA API (has MotherDuck; pharmacy backend is duckdb-free)
+const NHIA = 'https://clearline-nhia-api.onrender.com'
+
+const nhiaSearch = (path: string) => async (q: string): Promise<SearchResult[]> => {
+  try {
+    const res = await fetch(`${NHIA}${path}?q=${encodeURIComponent(q)}`)
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.results as SearchResult[]) ?? []
+  } catch {
+    return []
+  }
 }
 
-export const searchMembers    = search('/api/search/members')
-export const searchProviders  = search('/api/search/providers')
-export const searchProcedures = search('/api/search/procedures')
-export const searchDiagnoses  = search('/api/search/diagnoses')
+export const searchMembers    = nhiaSearch('/api/search/members')
+export const searchProviders  = nhiaSearch('/api/search/providers')
+export const searchProcedures = nhiaSearch('/api/search/procedures')
+export const searchDiagnoses  = nhiaSearch('/api/search/diagnoses')
