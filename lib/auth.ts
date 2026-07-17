@@ -11,7 +11,7 @@ export interface StaffSession extends UserSession {}
 export interface AggregatorSession extends UserSession {}
 
 export async function getStaffSession(): Promise<StaffSession | null> {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get(STAFF_SESSION_COOKIE)?.value
   if (!token) return null
   try {
@@ -22,7 +22,7 @@ export async function getStaffSession(): Promise<StaffSession | null> {
 }
 
 export async function getAggregatorSession(): Promise<AggregatorSession | null> {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get(AGGREGATOR_SESSION_COOKIE)?.value
   if (!token) return null
   try {
