@@ -2,8 +2,8 @@ import { useEffect, useRef, useCallback } from 'react'
 import type {
   BidUpdateEvent,
   SessionClosedEvent,
-  CollectionVerifiedEvent,
-  ApprovalGeneratedEvent,
+  OrderAcceptedEvent,
+  OrderCompletedEvent,
 } from './types'
 
 const MAX_BACKOFF_MS = 30_000
@@ -11,8 +11,10 @@ const MAX_BACKOFF_MS = 30_000
 interface StreamHandlers {
   onBidUpdate?: (e: BidUpdateEvent) => void
   onSessionClosed?: (e: SessionClosedEvent) => void
-  onCollectionVerified?: (e: CollectionVerifiedEvent) => void
-  onApprovalGenerated?: (e: ApprovalGeneratedEvent) => void
+  onOrderAccepted?: (e: OrderAcceptedEvent) => void
+  onOrderFulfilled?: () => void
+  onOrderCompleted?: (e: OrderCompletedEvent) => void
+  onOrderNotReceived?: () => void
   onReconnecting?: (reconnecting: boolean) => void
 }
 
@@ -45,12 +47,22 @@ export function useOrderStream(orderId: string | null, handlers: StreamHandlers)
       es.close()
     })
 
-    es.addEventListener('collection_verified', (e: MessageEvent) => {
-      handlersRef.current.onCollectionVerified?.(JSON.parse(e.data) as CollectionVerifiedEvent)
+    es.addEventListener('order_accepted', (e: MessageEvent) => {
+      handlersRef.current.onOrderAccepted?.(JSON.parse(e.data) as OrderAcceptedEvent)
     })
 
-    es.addEventListener('approval_generated', (e: MessageEvent) => {
-      handlersRef.current.onApprovalGenerated?.(JSON.parse(e.data) as ApprovalGeneratedEvent)
+    es.addEventListener('order_fulfilled', () => {
+      handlersRef.current.onOrderFulfilled?.()
+    })
+
+    es.addEventListener('order_completed', (e: MessageEvent) => {
+      handlersRef.current.onOrderCompleted?.(JSON.parse(e.data) as OrderCompletedEvent)
+      es.close()
+    })
+
+    es.addEventListener('order_not_received', () => {
+      handlersRef.current.onOrderNotReceived?.()
+      es.close()
     })
 
     es.onerror = () => {

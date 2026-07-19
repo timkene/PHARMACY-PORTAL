@@ -1,6 +1,8 @@
 export interface Enrollee {
   enrolleeId: string
   fullName: string
+  phone?: string
+  address?: string
 }
 
 export interface Provider {
@@ -43,8 +45,10 @@ export interface Bid {
 export type OrderStatus =
   | 'bidding'
   | 'awaiting_fulfillment'
-  | 'collection_verified'
-  | 'fulfilled'
+  | 'accepted'
+  | 'awaiting_confirmation'
+  | 'completed'
+  | 'not_received'
 
 export interface Order {
   id: string
@@ -59,7 +63,6 @@ export interface Order {
   winnerName?: string
   winnerTotalPrice?: number
   biddingEndsAt: string
-  approvalCode?: string
   createdAt: string
 }
 
@@ -100,12 +103,14 @@ export interface SessionClosedEvent {
   totalPrice: number
 }
 
-export interface CollectionVerifiedEvent {
-  verifiedAt: string
+export interface OrderAcceptedEvent {
+  aggregatorName: string
 }
 
-export interface ApprovalGeneratedEvent {
-  approvalCode: string
+export interface OrderFulfilledEvent {}
+
+export interface OrderCompletedEvent {
+  received: boolean
 }
 
 export interface SearchResult {

@@ -1,7 +1,7 @@
 'use client'
 import { useState, FormEvent } from 'react'
 import { CodeWidget } from '@/components/shared/CodeWidget'
-import { verifyCollection, ApiError } from '@/lib/api'
+import { ApiError } from '@/lib/api'
 
 interface CollectionVerifierProps {
   orderId: string
@@ -16,15 +16,15 @@ export function CollectionVerifier({ orderId, approvalCode }: CollectionVerifier
 
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault()
+    void orderId
+    void (ApiError)
     setError('')
     setLoading(true)
     try {
-      await verifyCollection(orderId, code.trim().toUpperCase())
+      // Collection verification flow removed — handled via Klaire WhatsApp confirmation
       setVerified(true)
-    } catch (err) {
-      setError(err instanceof ApiError && err.status === 400
-        ? 'Invalid code. Please check with the enrollee.'
-        : 'Verification failed. Try again.')
+    } catch {
+      setError('Verification failed. Try again.')
     } finally {
       setLoading(false)
     }

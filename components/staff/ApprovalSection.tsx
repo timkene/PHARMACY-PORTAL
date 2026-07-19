@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { CodeWidget } from '@/components/shared/CodeWidget'
-import { generateApproval, ApiError } from '@/lib/api'
+import { ApiError } from '@/lib/api'
 
 interface ApprovalSectionProps {
   orderId: string
@@ -15,16 +15,13 @@ export function ApprovalSection({ orderId, enabled, existingCode, onGenerated }:
   const [error, setError] = useState('')
 
   const handleGenerate = async () => {
+    void orderId
+    void (ApiError)
+    void onGenerated
     setLoading(true)
     setError('')
-    try {
-      const { approvalCode } = await generateApproval(orderId)
-      onGenerated(approvalCode)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to generate approval code')
-    } finally {
-      setLoading(false)
-    }
+    // Approval code generation removed — fulfillment confirmed via Klaire WhatsApp
+    setLoading(false)
   }
 
   if (existingCode) {

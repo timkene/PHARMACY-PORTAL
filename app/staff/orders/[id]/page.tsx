@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { StaffShell } from '@/components/staff/StaffShell'
 import { BiddingTable } from '@/components/staff/BiddingTable'
-import { ApprovalSection } from '@/components/staff/ApprovalSection'
 import { CountdownTimer } from '@/components/shared/CountdownTimer'
 import { MedicationTag } from '@/components/shared/MedicationTag'
 import { StatusChip } from '@/components/shared/StatusChip'
@@ -11,6 +10,15 @@ import { Toast } from '@/components/shared/Toast'
 import { useOrderStream } from '@/lib/sse'
 import { getOrder, ApiError } from '@/lib/api'
 import type { Order, Bid, OrderStatus } from '@/lib/types'
+
+const STATUS_LABELS: Record<OrderStatus, string> = {
+  bidding: 'Bidding Active',
+  awaiting_fulfillment: 'Awaiting Acceptance',
+  accepted: 'Order Accepted',
+  awaiting_confirmation: 'Awaiting Enrollee Confirmation',
+  completed: 'Completed',
+  not_received: 'Not Received — Follow Up Required',
+}
 
 function OrderSkeleton() {
   return (
@@ -27,7 +35,6 @@ export default function StaffOrderPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [bids, setBids] = useState<Bid[]>([])
   const [status, setStatus] = useState<OrderStatus | null>(null)
-  const [approvalCode, setApprovalCode] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
   const [reconnecting, setReconnecting] = useState(false)
@@ -38,7 +45,6 @@ export default function StaffOrderPage() {
       setOrder(data.order)
       setBids(data.bids)
       setStatus(data.status)
-      if (data.order.approvalCode) setApprovalCode(data.order.approvalCode)
     } catch (err) {
       setToast(err instanceof ApiError ? err.message : 'Failed to load order')
     } finally {
@@ -48,22 +54,18 @@ export default function StaffOrderPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Stop SSE when fulfilled
-  const streamOrderId = status === 'fulfilled' ? null : id
+  const isTerminal = status === 'completed' || status === 'not_received'
 
-  useOrderStream(streamOrderId, {
+  useOrderStream(isTerminal ? null : id, {
     onBidUpdate: ({ bids: newBids }) => setBids(newBids),
     onSessionClosed: ({ winnerId, winnerName, totalPrice }) => {
       setStatus('awaiting_fulfillment')
-      setOrder(prev =>
-        prev ? { ...prev, winnerId, winnerName, winnerTotalPrice: totalPrice } : prev
-      )
+      setOrder(prev => prev ? { ...prev, winnerId, winnerName, winnerTotalPrice: totalPrice } : prev)
     },
-    onCollectionVerified: () => setStatus('collection_verified'),
-    onApprovalGenerated: ({ approvalCode: code }) => {
-      setApprovalCode(code)
-      setStatus('fulfilled')
-    },
+    onOrderAccepted: () => setStatus('accepted'),
+    onOrderFulfilled: () => setStatus('awaiting_confirmation'),
+    onOrderCompleted: () => setStatus('completed'),
+    onOrderNotReceived: () => setStatus('not_received'),
     onReconnecting: setReconnecting,
   })
 
@@ -111,6 +113,16 @@ export default function StaffOrderPage() {
                 )}
                 {order.medications.map(m => m.diagnosis).filter(Boolean).join(' · ')}
               </p>
+              {order.enrollee.phone && (
+                <p className="text-label-sm text-on-surface-variant mt-0.5">
+                  Phone: <span className="font-semibold text-on-surface">{order.enrollee.phone}</span>
+                </p>
+              )}
+              {order.enrollee.address && (
+                <p className="text-label-sm text-on-surface-variant mt-0.5">
+                  Address: <span className="font-semibold text-on-surface">{order.enrollee.address}</span>
+                </p>
+              )}
               {order.provider && (
                 <p className="text-label-sm text-on-surface-variant mt-0.5">
                   Provider: <span className="font-semibold text-on-surface">{order.provider.providerName}</span>
@@ -145,11 +157,11 @@ export default function StaffOrderPage() {
           </div>
         )}
 
-        {/* STATE 2: Awaiting Fulfillment / Collection Verified */}
-        {(status === 'awaiting_fulfillment' || status === 'collection_verified') && (
-          <div className="bg-surface-lowest border border-outline-variant rounded p-6 space-y-3">
+        {/* STATE 2: Winner selected — awaiting acceptance */}
+        {status === 'awaiting_fulfillment' && (
+          <div className="bg-surface-lowest border border-outline-variant rounded p-6 space-y-2">
             <div className="flex items-center gap-3 flex-wrap">
-              <StatusChip status="pending" label="Awaiting Collection Verification" />
+              <StatusChip status="pending" label="Awaiting Acceptance" />
               <span className="text-body-sm font-bold text-on-surface">
                 Winner: {order.winnerName}
               </span>
@@ -163,23 +175,55 @@ export default function StaffOrderPage() {
               )}
             </div>
             <p className="text-body-sm text-on-surface-variant">
-              The enrollee has been notified by SMS with a collection code. Waiting for{' '}
-              {order.winnerName} to verify receipt.
+              Waiting for {order.winnerName} to accept the order. The enrollee has been notified via WhatsApp.
             </p>
           </div>
         )}
 
-        {/* STATE 3: Approval section (visible when collection verified or fulfilled) */}
-        {(status === 'collection_verified' || status === 'fulfilled') && (
-          <ApprovalSection
-            orderId={id}
-            enabled={status === 'collection_verified' || status === 'fulfilled'}
-            existingCode={approvalCode}
-            onGenerated={code => {
-              setApprovalCode(code)
-              setStatus('fulfilled')
-            }}
-          />
+        {/* STATE 3: Accepted */}
+        {status === 'accepted' && (
+          <div className="bg-secondary/10 border border-secondary/30 rounded p-5 space-y-1">
+            <div className="flex items-center gap-3">
+              <StatusChip status="active" label="Order Accepted" />
+              <span className="text-body-sm font-bold text-on-surface">{order.winnerName}</span>
+              <span className="font-mono text-code-mono text-on-surface">
+                ₦{order.winnerTotalPrice?.toLocaleString()}
+              </span>
+            </div>
+            <p className="text-body-sm text-on-surface-variant">
+              The pharmacy has accepted and is preparing the medication. The enrollee has been notified.
+            </p>
+          </div>
+        )}
+
+        {/* STATE 4: Awaiting confirmation from enrollee */}
+        {status === 'awaiting_confirmation' && (
+          <div className="bg-surface-container rounded p-5 space-y-1">
+            <StatusChip status="pending" label="Awaiting Enrollee Confirmation" />
+            <p className="text-body-sm text-on-surface-variant mt-2">
+              Klaire has asked the enrollee to confirm receipt. Waiting for their reply.
+            </p>
+          </div>
+        )}
+
+        {/* STATE 5: Completed */}
+        {status === 'completed' && (
+          <div className="bg-secondary/10 border border-secondary/30 rounded p-5">
+            <p className="text-secondary font-bold text-title-md mb-1">Order Completed</p>
+            <p className="text-body-sm text-on-surface-variant">
+              The enrollee confirmed they received their medication.
+            </p>
+          </div>
+        )}
+
+        {/* STATE 6: Not received */}
+        {status === 'not_received' && (
+          <div className="bg-error/10 border border-error/30 rounded p-5">
+            <p className="text-error font-bold text-title-md mb-1">Medication Not Received</p>
+            <p className="text-body-sm text-on-surface-variant">
+              The enrollee reported they did not receive their medication. Please follow up with {order.winnerName} immediately.
+            </p>
+          </div>
         )}
 
         {/* Bids table — always visible */}

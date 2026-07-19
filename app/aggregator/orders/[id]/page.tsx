@@ -4,12 +4,11 @@ import { useParams } from 'next/navigation'
 import { AggregatorShell } from '@/components/aggregator/AggregatorShell'
 import { BiddingTable } from '@/components/staff/BiddingTable'
 import { BidForm } from '@/components/aggregator/BidForm'
-import { CollectionVerifier } from '@/components/aggregator/CollectionVerifier'
 import { CountdownTimer } from '@/components/shared/CountdownTimer'
 import { MedicationTag } from '@/components/shared/MedicationTag'
 import { Toast } from '@/components/shared/Toast'
 import { useOrderStream } from '@/lib/sse'
-import { getOrder, ApiError } from '@/lib/api'
+import { getOrder, acceptOrder, fulfillOrder, ApiError } from '@/lib/api'
 import type { Order, Bid, OrderStatus } from '@/lib/types'
 
 export default function AggregatorOrderPage() {
@@ -17,10 +16,10 @@ export default function AggregatorOrderPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [bids, setBids] = useState<Bid[]>([])
   const [status, setStatus] = useState<OrderStatus | null>(null)
-  const [approvalCode, setApprovalCode] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
   const [reconnecting, setReconnecting] = useState(false)
+  const [actioning, setActioning] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -28,7 +27,6 @@ export default function AggregatorOrderPage() {
       setOrder(data.order)
       setBids(data.bids)
       setStatus(data.status)
-      setApprovalCode(data.order.approvalCode)
     } catch (err) {
       setToast(err instanceof ApiError ? err.message : 'Failed to load order')
     } finally {
@@ -38,17 +36,18 @@ export default function AggregatorOrderPage() {
 
   useEffect(() => { load() }, [load])
 
-  useOrderStream(status === 'fulfilled' ? null : id, {
+  const isTerminal = status === 'completed' || status === 'not_received'
+
+  useOrderStream(isTerminal ? null : id, {
     onBidUpdate: ({ bids: newBids }) => setBids(newBids),
     onSessionClosed: ({ winnerId, winnerName, totalPrice }) => {
       setStatus('awaiting_fulfillment')
       setOrder(prev => prev ? { ...prev, winnerId, winnerName, winnerTotalPrice: totalPrice } : prev)
     },
-    onCollectionVerified: () => setStatus('collection_verified'),
-    onApprovalGenerated: ({ approvalCode: code }) => {
-      setApprovalCode(code)
-      setStatus('fulfilled')
-    },
+    onOrderAccepted: () => setStatus('accepted'),
+    onOrderFulfilled: () => setStatus('awaiting_confirmation'),
+    onOrderCompleted: () => setStatus('completed'),
+    onOrderNotReceived: () => setStatus('not_received'),
     onReconnecting: setReconnecting,
   })
 
@@ -64,8 +63,35 @@ export default function AggregatorOrderPage() {
     )
   }
 
-  const isWinner = order.winnerId !== undefined
+  // Winner is determined by whether enrolleeId is populated (backend hides it from non-winners)
+  const isWinner = !!order.enrollee.enrolleeId
   const bidClosed = status !== 'bidding'
+
+  const handleAccept = async () => {
+    setActioning(true)
+    try {
+      await acceptOrder(id)
+      setStatus('accepted')
+      setToast('Order accepted! The enrollee has been notified.')
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : 'Failed to accept order')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleFulfill = async () => {
+    setActioning(true)
+    try {
+      await fulfillOrder(id)
+      setStatus('awaiting_confirmation')
+      setToast('Order marked as fulfilled. Klaire will ask the enrollee to confirm receipt.')
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : 'Failed to mark as fulfilled')
+    } finally {
+      setActioning(false)
+    }
+  }
 
   return (
     <AggregatorShell companyName="Your Pharmacy">
@@ -75,9 +101,21 @@ export default function AggregatorOrderPage() {
         <div className="bg-surface-lowest border border-outline-variant rounded p-6">
           <p className="font-mono text-code-mono text-on-surface-variant mb-1">{order.intakeId}</p>
           <h1 className="text-title-md font-semibold text-on-surface mb-1">{order.enrollee.fullName}</h1>
-          <p className="text-body-sm text-on-surface-variant mb-3">
+          <p className="text-body-sm text-on-surface-variant mb-1">
             {order.medications.map(m => m.diagnosis).filter(Boolean).join(' · ')}
           </p>
+          {order.enrollee.address && (
+            <p className="text-body-sm text-on-surface-variant mb-3">
+              Delivery address: <span className="font-semibold text-on-surface">{order.enrollee.address}</span>
+            </p>
+          )}
+          {/* Phone is only visible to the winner */}
+          {isWinner && order.enrollee.phone && (
+            <p className="text-body-sm text-on-surface-variant mb-3">
+              Enrollee phone: <span className="font-semibold text-on-surface">{order.enrollee.phone}</span>
+              <span className="ml-1 font-mono text-code-mono text-on-surface-variant">({order.enrollee.enrolleeId})</span>
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {order.medications.map((med, i) => <MedicationTag key={i} med={med} />)}
           </div>
@@ -94,17 +132,29 @@ export default function AggregatorOrderPage() {
           </div>
         )}
 
-        {/* Outcome banners */}
-        {bidClosed && isWinner && (
-          <div className="bg-secondary/10 border border-secondary/30 rounded p-5">
-            <p className="text-secondary font-bold text-title-md mb-1">You Were Selected</p>
-            <p className="text-body-sm text-on-surface-variant">
-              Total: <span className="font-mono text-code-mono text-on-surface">₦{order.winnerTotalPrice?.toLocaleString()}</span>
-            </p>
-            <p className="text-body-sm text-on-surface-variant mt-1">Please await the enrollee for collection.</p>
+        {/* You won — awaiting acceptance */}
+        {status === 'awaiting_fulfillment' && isWinner && (
+          <div className="bg-secondary/10 border border-secondary/30 rounded p-5 space-y-3">
+            <div>
+              <p className="text-secondary font-bold text-title-md mb-1">You Were Selected!</p>
+              <p className="text-body-sm text-on-surface-variant">
+                Total: <span className="font-mono text-code-mono text-on-surface">₦{order.winnerTotalPrice?.toLocaleString()}</span>
+              </p>
+              <p className="text-body-sm text-on-surface-variant mt-1">
+                Please accept the order to confirm you can fulfil it, then deliver to the enrollee.
+              </p>
+            </div>
+            <button
+              onClick={handleAccept}
+              disabled={actioning}
+              className="px-5 py-2.5 rounded bg-secondary text-on-secondary font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-60"
+            >
+              {actioning ? 'Accepting…' : 'Accept Order'}
+            </button>
           </div>
         )}
 
+        {/* Another aggregator won */}
         {bidClosed && !isWinner && (
           <div className="bg-surface-container rounded p-5">
             <p className="text-body-sm font-semibold text-on-surface-variant">Session Closed</p>
@@ -116,14 +166,58 @@ export default function AggregatorOrderPage() {
           </div>
         )}
 
+        {/* Accepted — show mark fulfilled button */}
+        {status === 'accepted' && isWinner && (
+          <div className="bg-secondary/10 border border-secondary/30 rounded p-5 space-y-3">
+            <div>
+              <p className="text-secondary font-bold text-title-md mb-1">Order Accepted</p>
+              <p className="text-body-sm text-on-surface-variant">
+                Deliver the medication to the enrollee at the address shown above, then mark the order as fulfilled.
+              </p>
+            </div>
+            <button
+              onClick={handleFulfill}
+              disabled={actioning}
+              className="px-5 py-2.5 rounded bg-primary text-on-primary font-semibold hover:bg-primary/80 transition-colors disabled:opacity-60"
+            >
+              {actioning ? 'Updating…' : 'Mark as Fulfilled'}
+            </button>
+          </div>
+        )}
+
+        {/* Awaiting confirmation */}
+        {status === 'awaiting_confirmation' && isWinner && (
+          <div className="bg-surface-container rounded p-5">
+            <p className="text-body-sm font-semibold text-on-surface">Awaiting Enrollee Confirmation</p>
+            <p className="text-body-sm text-on-surface-variant mt-1">
+              Klaire is confirming receipt with the enrollee via WhatsApp. You'll be notified of the outcome.
+            </p>
+          </div>
+        )}
+
+        {/* Completed */}
+        {status === 'completed' && (
+          <div className="bg-secondary/10 border border-secondary/30 rounded p-5">
+            <p className="text-secondary font-bold text-title-md mb-1">Order Completed</p>
+            <p className="text-body-sm text-on-surface-variant">The enrollee confirmed they received their medication.</p>
+          </div>
+        )}
+
+        {/* Not received */}
+        {status === 'not_received' && (
+          <div className="bg-error/10 border border-error/30 rounded p-5">
+            <p className="text-error font-bold text-title-md mb-1">Enrollee Did Not Receive Medication</p>
+            <p className="text-body-sm text-on-surface-variant">
+              The enrollee reported non-receipt. Please contact the Clearline team at <strong>08076490056</strong> (WhatsApp, select Pharmacy) to resolve this.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
           <BiddingTable bids={bids} reconnecting={reconnecting} />
 
           <div className="space-y-4">
             {status === 'bidding' && <BidForm orderId={id} />}
-            {(status === 'awaiting_fulfillment' || status === 'collection_verified' || status === 'fulfilled') && isWinner && (
-              <CollectionVerifier orderId={id} approvalCode={approvalCode} />
-            )}
           </div>
         </div>
       </div>

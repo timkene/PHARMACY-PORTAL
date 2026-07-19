@@ -101,12 +101,13 @@ export const getOrder = async (id: string): Promise<{ order: Order; bids: Bid[];
   return { order, bids: order.bids ?? [], status: order.status }
 }
 
-export const generateApproval = (id: string) =>
-  apiFetch<{ approvalCode: string }>(`/api/orders/${id}/generate-approval`, {
-    method: 'POST',
-  })
+// Aggregator actions
+export const acceptOrder = (orderId: string) =>
+  apiFetch<{ success: boolean }>(`/api/orders/${orderId}/accept`, { method: 'POST' })
 
-// Aggregator
+export const fulfillOrder = (orderId: string) =>
+  apiFetch<{ success: boolean }>(`/api/orders/${orderId}/fulfill`, { method: 'POST' })
+
 export const getAggregatorDashboard = () =>
   apiFetch<AggregatorDashboard>('/api/aggregator/dashboard')
 
@@ -116,18 +117,10 @@ export const placeBid = (orderId: string, unitPrice: number, totalPrice: number)
     body: JSON.stringify({ unitPrice, totalPrice }),
   })
 
-export const verifyCollection = (orderId: string, collectionCode: string) =>
-  apiFetch<{ ok: boolean }>(`/api/orders/${orderId}/verify-collection`, {
-    method: 'POST',
-    body: JSON.stringify({ collectionCode }),
-  })
-
-// Search — proxied through NHIA API (has MotherDuck; pharmacy backend is duckdb-free)
-const NHIA = 'https://clearline-nhia-api.onrender.com'
-
+// Search — uses pharmacy backend (has MotherDuck)
 const nhiaSearch = (path: string) => async (q: string): Promise<SearchResult[]> => {
   try {
-    const res = await fetch(`${NHIA}${path}?q=${encodeURIComponent(q)}`)
+    const res = await fetch(`https://clearline-nhia-api.onrender.com${path}?q=${encodeURIComponent(q)}`)
     if (!res.ok) return []
     const data = await res.json()
     return (data.results as SearchResult[]) ?? []
@@ -140,3 +133,11 @@ export const searchMembers    = nhiaSearch('/api/search/members')
 export const searchProviders  = nhiaSearch('/api/search/providers')
 export const searchProcedures = nhiaSearch('/api/search/procedures')
 export const searchDiagnoses  = nhiaSearch('/api/search/diagnoses')
+
+export const getMemberDetail = async (enrolleeId: string): Promise<{ phone: string | null; address: string | null }> => {
+  try {
+    return await apiFetch<{ phone: string | null; address: string | null }>(`/api/members/${encodeURIComponent(enrolleeId)}`)
+  } catch {
+    return { phone: null, address: null }
+  }
+}

@@ -8,6 +8,7 @@ import {
   searchProviders,
   searchProcedures,
   searchDiagnoses,
+  getMemberDetail,
 } from '@/lib/api'
 
 interface IntakeFormProps {
@@ -40,10 +41,28 @@ const INPUT_CLS =
   'w-full border border-outline-variant rounded px-3 py-2 text-body-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20'
 
 export function IntakeForm({ onSubmit, submitting }: IntakeFormProps) {
-  const [enrollee, setEnrollee] = useState<Enrollee>({ enrolleeId: '', fullName: '' })
+  const [enrollee, setEnrollee] = useState<Enrollee>({ enrolleeId: '', fullName: '', phone: '', address: '' })
   const [provider, setProvider] = useState<Provider>({ providerId: '', providerName: '' })
   const [medications, setMedications] = useState<Medication[]>([])
   const [medError, setMedError] = useState('')
+  const [fetchingContact, setFetchingContact] = useState(false)
+
+  // ── Enrollee selection ─────────────────────────────────────────────────────
+
+  const handleEnrolleeSelect = async (r: { code: string; label: string }) => {
+    setEnrollee(prev => ({ ...prev, enrolleeId: r.code, fullName: r.label }))
+    setFetchingContact(true)
+    try {
+      const detail = await getMemberDetail(r.code)
+      setEnrollee(prev => ({
+        ...prev,
+        phone: detail.phone ?? '',
+        address: detail.address ?? '',
+      }))
+    } finally {
+      setFetchingContact(false)
+    }
+  }
 
   // ── Medication helpers ─────────────────────────────────────────────────────
 
@@ -110,7 +129,7 @@ export function IntakeForm({ onSubmit, submitting }: IntakeFormProps) {
             <SearchComboBox
               placeholder="e.g. CL12345 or Jane Doe"
               onSearch={searchMembers}
-              onSelect={r => setEnrollee({ enrolleeId: r.code, fullName: r.label })}
+              onSelect={handleEnrolleeSelect}
               displayValue={enrollee.enrolleeId ? `${enrollee.enrolleeId} — ${enrollee.fullName}` : ''}
             />
             {enrollee.enrolleeId && (
@@ -121,6 +140,37 @@ export function IntakeForm({ onSubmit, submitting }: IntakeFormProps) {
               </p>
             )}
           </div>
+
+          {/* Phone — auto-filled from MEMBER table, editable */}
+          {enrollee.enrolleeId && (
+            <div>
+              <label className="block text-body-sm font-semibold mb-1">
+                Phone Number
+                {fetchingContact && (
+                  <span className="ml-2 text-label-sm text-on-surface-variant font-normal">fetching…</span>
+                )}
+              </label>
+              <input
+                className={INPUT_CLS}
+                placeholder="e.g. 08012345678"
+                value={enrollee.phone ?? ''}
+                onChange={e => setEnrollee(prev => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+          )}
+
+          {/* Address — auto-filled from MEMBER table, editable */}
+          {enrollee.enrolleeId && (
+            <div>
+              <label className="block text-body-sm font-semibold mb-1">Address</label>
+              <input
+                className={INPUT_CLS}
+                placeholder="e.g. 12 Adeola Odeku Street, VI, Lagos"
+                value={enrollee.address ?? ''}
+                onChange={e => setEnrollee(prev => ({ ...prev, address: e.target.value }))}
+              />
+            </div>
+          )}
 
           {/* Provider */}
           <div>

@@ -10,10 +10,12 @@ import type { Order, OrderStatus } from '@/lib/types'
 const PAGE_SIZE = 20
 
 const STATUS_CHIP_MAP: Record<OrderStatus, { status: 'active' | 'pending' | 'error' | 'info'; label: string }> = {
-  bidding:              { status: 'active',  label: 'Bidding' },
-  awaiting_fulfillment: { status: 'pending', label: 'Awaiting Fulfillment' },
-  collection_verified:  { status: 'info',    label: 'Verified' },
-  fulfilled:            { status: 'active',  label: 'Fulfilled' },
+  bidding:               { status: 'active',  label: 'Bidding' },
+  awaiting_fulfillment:  { status: 'pending', label: 'Awaiting Acceptance' },
+  accepted:              { status: 'info',    label: 'Accepted' },
+  awaiting_confirmation: { status: 'pending', label: 'Confirming Receipt' },
+  completed:             { status: 'active',  label: 'Completed' },
+  not_received:          { status: 'error',   label: 'Not Received' },
 }
 
 const TABLE_HEADERS = ['Intake ID', 'Enrollee', 'Diagnosis', 'Medications', 'Status', 'Time', 'Action']
@@ -65,7 +67,7 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
   const activeBidding = orders.filter(o => o.status === 'bidding').length
   const awaitingFulfillment = orders.filter(o => o.status === 'awaiting_fulfillment').length
   const completedToday = orders.filter(o => {
-    if (o.status !== 'fulfilled') return false
+    if (o.status !== 'completed') return false
     const d = new Date(o.createdAt)
     const now = new Date()
     return d.toDateString() === now.toDateString()

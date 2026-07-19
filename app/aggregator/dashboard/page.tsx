@@ -64,7 +64,7 @@ export default function AggregatorDashboardPage() {
                     href={`/aggregator/orders/${order.id}`}
                     className="bg-secondary hover:bg-secondary/90 text-on-secondary px-4 py-1.5 rounded font-semibold text-body-sm transition-colors"
                   >
-                    Verify Collection
+                    View Order
                   </Link>
                 </div>
               ))}
@@ -80,7 +80,7 @@ export default function AggregatorDashboardPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-outline-variant">
-                    {['Order ID', 'Date', 'Total', 'Approval Code'].map(h => (
+                    {['Order ID', 'Date', 'Total', 'Status'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-label-caps text-on-surface-variant uppercase tracking-widest">
                         {h}
                       </th>
@@ -98,9 +98,9 @@ export default function AggregatorDashboardPage() {
                         ₦{order.winnerTotalPrice?.toLocaleString() ?? '—'}
                       </td>
                       <td className="px-4 py-3">
-                        {order.approvalCode
-                          ? <span className="font-mono text-code-mono bg-surface-container px-2 py-0.5 rounded">{order.approvalCode}</span>
-                          : <span className="text-body-sm text-on-surface-variant">—</span>}
+                        <span className="text-body-sm text-on-surface-variant capitalize">
+                          {order.status.replace(/_/g, ' ')}
+                        </span>
                       </td>
                     </tr>
                   ))}
