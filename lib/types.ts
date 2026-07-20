@@ -34,10 +34,8 @@ export interface Bid {
   id: string
   aggregatorId: string
   aggregatorName: string
-  reliabilityScore: number
   unitPrice: number
   totalPrice: number
-  deliveryTimeline: string
   isCheapest: boolean
   submittedAt: string
 }

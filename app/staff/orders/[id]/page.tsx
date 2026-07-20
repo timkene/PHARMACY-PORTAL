@@ -165,9 +165,11 @@ export default function StaffOrderPage() {
               <span className="text-body-sm font-bold text-on-surface">
                 Winner: {order.winnerName}
               </span>
-              <span className="font-mono text-code-mono text-on-surface">
-                ₦{order.winnerTotalPrice?.toLocaleString()}
-              </span>
+              {order.winnerTotalPrice ? (
+                <span className="font-mono text-code-mono text-on-surface">
+                  ₦{order.winnerTotalPrice.toLocaleString()}
+                </span>
+              ) : null}
               {savings > 0 && (
                 <span className="text-body-sm text-secondary">
                   ↓ ₦{savings.toLocaleString()} saved vs avg
@@ -175,7 +177,9 @@ export default function StaffOrderPage() {
               )}
             </div>
             <p className="text-body-sm text-on-surface-variant">
-              Waiting for {order.winnerName} to accept the order. The enrollee has been notified via WhatsApp.
+              {order.winnerName
+                ? `Waiting for ${order.winnerName} to accept the order. The enrollee has been notified via WhatsApp.`
+                : 'Bidding closed with no bids received.'}
             </p>
           </div>
         )}

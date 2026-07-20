@@ -25,7 +25,7 @@ export function BiddingTable({ bids, reconnecting = false }: BiddingTableProps) 
         <table className="w-full">
           <thead>
             <tr className="border-b border-outline-variant">
-              {['Aggregator', 'Unit Price', 'Total Quote', 'Status', 'Delivery'].map(h => (
+              {['Aggregator', 'Unit Price', 'Total Quote', 'Status'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-label-caps text-on-surface-variant uppercase tracking-widest">
                   {h}
                 </th>
@@ -35,7 +35,7 @@ export function BiddingTable({ bids, reconnecting = false }: BiddingTableProps) 
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-body-sm text-on-surface-variant">
+                <td colSpan={4} className="px-4 py-8 text-center text-body-sm text-on-surface-variant">
                   Waiting for bids…
                 </td>
               </tr>
@@ -50,10 +50,7 @@ export function BiddingTable({ bids, reconnecting = false }: BiddingTableProps) 
                   }`}
                 >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-body-sm font-semibold text-on-surface">{bid.aggregatorName}</span>
-                      <span className="text-label-caps text-on-surface-variant">★ {bid.reliabilityScore}</span>
-                    </div>
+                    <span className="text-body-sm font-semibold text-on-surface">{bid.aggregatorName}</span>
                   </td>
                   <td className="px-4 py-3 font-mono text-code-mono text-on-surface">
                     ₦{bid.unitPrice.toLocaleString()}
@@ -69,9 +66,6 @@ export function BiddingTable({ bids, reconnecting = false }: BiddingTableProps) 
                     ) : (
                       <span className="text-body-sm text-on-surface-variant">Competitive</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-body-sm text-on-surface-variant">
-                    {bid.deliveryTimeline}
                   </td>
                 </tr>
               ))
