@@ -11,7 +11,7 @@ import type {
   SearchResult,
 } from './types'
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://pharmacy-dispatch-api.onrender.com'
 
 function setDomainCookie(name: string, value: string) {
   if (typeof document === 'undefined') return
