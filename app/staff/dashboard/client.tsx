@@ -121,7 +121,8 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
                 {loading
                   ? Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
                   : paged.map((order, idx) => {
-                      const chip = STATUS_CHIP_MAP[order.status]
+                      const chip = STATUS_CHIP_MAP[order.status] ?? { status: 'info' as const, label: order.status }
+                      const meds = order.medications ?? []
                       return (
                         <tr
                           key={order.id}
@@ -130,9 +131,9 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
                           <td className="px-4 py-3 font-mono text-code-mono text-on-surface">{order.intakeId}</td>
                           <td className="px-4 py-3 text-body-sm text-on-surface">{order.enrollee.fullName}</td>
                           <td className="px-4 py-3 text-body-sm text-on-surface-variant">
-                            {order.medications.map(m => m.diagnosis).filter(Boolean).join(', ') || order.diagnosis || '—'}
+                            {meds.map(m => m.diagnosis).filter(Boolean).join(', ') || order.diagnosis || '—'}
                           </td>
-                          <td className="px-4 py-3 text-body-sm text-on-surface-variant">{order.medications.length}</td>
+                          <td className="px-4 py-3 text-body-sm text-on-surface-variant">{meds.length}</td>
                           <td className="px-4 py-3"><StatusChip status={chip.status} label={chip.label} /></td>
                           <td className="px-4 py-3 text-body-sm text-on-surface-variant">
                             {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
