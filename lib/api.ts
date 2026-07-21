@@ -96,6 +96,9 @@ export const createOrder = (payload: {
 export const getOrders = () =>
   apiFetch<{ orders: Order[] }>('/api/orders')
 
+export const deleteOrder = (id: string) =>
+  apiFetch<{ success: boolean }>(`/api/orders/${id}`, { method: 'DELETE' })
+
 export const getOrder = async (id: string): Promise<{ order: Order; bids: Bid[]; status: OrderStatus }> => {
   const order = await apiFetch<Order>(`/api/orders/${id}`)
   return { order, bids: order.bids ?? [], status: order.status }

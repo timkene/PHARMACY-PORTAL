@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { StaffShell } from '@/components/staff/StaffShell'
 import { StatusChip } from '@/components/shared/StatusChip'
 import { Toast } from '@/components/shared/Toast'
-import { getOrders, ApiError } from '@/lib/api'
+import { getOrders, deleteOrder, ApiError } from '@/lib/api'
 import type { Order, OrderStatus } from '@/lib/types'
 
 const PAGE_SIZE = 20
@@ -50,6 +50,20 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  const handleDelete = async (id: string, intakeId: string) => {
+    if (!window.confirm(`Delete order ${intakeId}? This cannot be undone.`)) return
+    setDeleting(id)
+    try {
+      await deleteOrder(id)
+      setOrders(prev => prev.filter(o => o.id !== id))
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : 'Failed to delete order')
+    } finally {
+      setDeleting(null)
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -139,12 +153,21 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
                             {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </td>
                           <td className="px-4 py-3">
-                            <Link
-                              href={`/staff/orders/${order.id}`}
-                              className="text-body-sm text-primary hover:underline font-semibold"
-                            >
-                              View
-                            </Link>
+                            <div className="flex items-center gap-3">
+                              <Link
+                                href={`/staff/orders/${order.id}`}
+                                className="text-body-sm text-primary hover:underline font-semibold"
+                              >
+                                View
+                              </Link>
+                              <button
+                                onClick={() => handleDelete(order.id, order.intakeId)}
+                                disabled={deleting === order.id}
+                                className="text-body-sm text-error hover:underline font-semibold disabled:opacity-40"
+                              >
+                                {deleting === order.id ? 'Deleting…' : 'Delete'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )
