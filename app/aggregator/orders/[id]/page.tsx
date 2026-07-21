@@ -217,7 +217,7 @@ export default function AggregatorOrderPage() {
           <BiddingTable bids={bids} reconnecting={reconnecting} />
 
           <div className="space-y-4">
-            {status === 'bidding' && <BidForm orderId={id} />}
+            {status === 'bidding' && <BidForm orderId={id} medications={order.medications} />}
           </div>
         </div>
       </div>

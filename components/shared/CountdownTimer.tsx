@@ -14,12 +14,18 @@ function formatTime(ms: number): string {
 
 const TWO_MINUTES_MS = 2 * 60 * 1000
 
+function parseUtc(s: string): number {
+  // Append Z if no timezone offset so JS treats it as UTC, not local time
+  const utc = /[Z+\-]\d*$/.test(s) ? s : s + 'Z'
+  return new Date(utc).getTime()
+}
+
 export function CountdownTimer({ endsAt }: CountdownTimerProps) {
-  const [remaining, setRemaining] = useState(() => new Date(endsAt).getTime() - Date.now())
+  const [remaining, setRemaining] = useState(() => parseUtc(endsAt) - Date.now())
 
   useEffect(() => {
     const id = setInterval(() => {
-      setRemaining(new Date(endsAt).getTime() - Date.now())
+      setRemaining(parseUtc(endsAt) - Date.now())
     }, 1000)
     return () => clearInterval(id)
   }, [endsAt])
