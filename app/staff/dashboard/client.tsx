@@ -78,13 +78,19 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
 
   useEffect(() => { load() }, [load])
 
+  // Poll every 20 s — keeps status chips and stats live without SSE on the list
+  useEffect(() => {
+    const id = setInterval(load, 20_000)
+    return () => clearInterval(id)
+  }, [load])
+
+  const today = new Date().toDateString()
   const activeBidding = orders.filter(o => o.status === 'bidding').length
   const awaitingFulfillment = orders.filter(o => o.status === 'awaiting_fulfillment').length
   const completedToday = orders.filter(o => {
-    if (o.status !== 'completed') return false
-    const d = new Date(o.createdAt)
-    const now = new Date()
-    return d.toDateString() === now.toDateString()
+    if (o.status !== 'completed' && o.status !== 'not_received') return false
+    const stamp = o.completedAt ?? o.createdAt
+    return new Date(stamp.endsWith('Z') ? stamp : stamp + 'Z').toDateString() === today
   }).length
 
   const totalPages = Math.ceil(orders.length / PAGE_SIZE)

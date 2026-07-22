@@ -29,6 +29,12 @@ export default function AggregatorDashboardPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Poll every 15 s so new bidding sessions appear without a manual refresh
+  useEffect(() => {
+    const id = setInterval(load, 15_000)
+    return () => clearInterval(id)
+  }, [load])
+
   return (
     <AggregatorShell companyName="Your Pharmacy">
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

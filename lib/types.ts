@@ -62,6 +62,7 @@ export interface Order {
   winnerTotalPrice?: number
   biddingEndsAt: string
   createdAt: string
+  completedAt?: string
 }
 
 export interface StaffUser {
