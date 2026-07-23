@@ -10,6 +10,8 @@ import type { Order, OrderStatus } from '@/lib/types'
 const PAGE_SIZE = 20
 
 const STATUS_CHIP_MAP: Record<OrderStatus, { status: 'active' | 'pending' | 'error' | 'info'; label: string }> = {
+  pending_review:        { status: 'pending', label: 'Awaiting Review' },
+  rejected:              { status: 'error',   label: 'Rejected' },
   bidding:               { status: 'active',  label: 'Bidding' },
   awaiting_fulfillment:  { status: 'pending', label: 'Awaiting Acceptance' },
   accepted:              { status: 'info',    label: 'Accepted' },
