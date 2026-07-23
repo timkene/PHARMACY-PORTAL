@@ -41,6 +41,8 @@ export interface Bid {
 }
 
 export type OrderStatus =
+  | 'pending_review'
+  | 'rejected'
   | 'bidding'
   | 'awaiting_fulfillment'
   | 'accepted'
@@ -60,7 +62,9 @@ export interface Order {
   winnerId?: string
   winnerName?: string
   winnerTotalPrice?: number
-  biddingEndsAt: string
+  fulfillmentType?: 'delivered' | 'picked_up'
+  deliveryFee?: number
+  biddingEndsAt?: string
   createdAt: string
   completedAt?: string
 }

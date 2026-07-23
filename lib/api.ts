@@ -109,8 +109,15 @@ export const getOrder = async (id: string): Promise<{ order: Order; bids: Bid[];
 export const acceptOrder = (orderId: string) =>
   apiFetch<{ success: boolean }>(`/api/orders/${orderId}/accept`, { method: 'POST' })
 
-export const fulfillOrder = (orderId: string) =>
-  apiFetch<{ success: boolean }>(`/api/orders/${orderId}/fulfill`, { method: 'POST' })
+export const fulfillOrder = (
+  orderId: string,
+  fulfillmentType: 'delivered' | 'picked_up',
+  deliveryFee?: number
+) =>
+  apiFetch<{ success: boolean }>(`/api/orders/${orderId}/fulfill`, {
+    method: 'POST',
+    body: JSON.stringify({ fulfillmentType, deliveryFee }),
+  })
 
 export const getAggregatorDashboard = () =>
   apiFetch<AggregatorDashboard>('/api/aggregator/dashboard')

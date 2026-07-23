@@ -19,6 +19,8 @@ export default function AggregatorOrderPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [reconnecting, setReconnecting] = useState(false)
   const [actioning, setActioning] = useState(false)
+  const [fulfillMode, setFulfillMode] = useState<'delivered' | 'picked_up' | null>(null)
+  const [deliveryFee, setDeliveryFee] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -79,12 +81,23 @@ export default function AggregatorOrderPage() {
     }
   }
 
-  const handleFulfill = async () => {
+  const handleFulfill = async (type: 'delivered' | 'picked_up') => {
+    const fee = type === 'delivered' ? parseFloat(deliveryFee) : undefined
+    if (type === 'delivered' && (!fee || fee <= 0)) {
+      setToast('Please enter a valid delivery fee.')
+      return
+    }
     setActioning(true)
     try {
-      await fulfillOrder(id)
-      setStatus('awaiting_confirmation')
-      setToast('Order marked as fulfilled. Klaire will ask the enrollee to confirm receipt.')
+      await fulfillOrder(id, type, fee)
+      if (type === 'picked_up') {
+        setStatus('completed')
+        setToast('Order closed — marked as picked up. Submitted for payment.')
+      } else {
+        setStatus('awaiting_confirmation')
+        setToast('Order marked as delivered. Klaire will ask the enrollee to confirm receipt.')
+      }
+      setFulfillMode(null)
     } catch (err) {
       setToast(err instanceof ApiError ? err.message : 'Failed to mark as fulfilled')
     } finally {
@@ -161,22 +174,84 @@ export default function AggregatorOrderPage() {
           </div>
         )}
 
-        {/* Accepted — show mark fulfilled button */}
+        {/* Accepted — choose fulfillment type */}
         {status === 'accepted' && isWinner && (
-          <div className="bg-secondary/10 border border-secondary/30 rounded p-5 space-y-3">
+          <div className="bg-secondary/10 border border-secondary/30 rounded p-5 space-y-4">
             <div>
               <p className="text-secondary font-bold text-title-md mb-1">Order Accepted</p>
               <p className="text-body-sm text-on-surface-variant">
-                Deliver the medication to the enrollee at the address shown above, then mark the order as fulfilled.
+                How was this order fulfilled?
               </p>
             </div>
-            <button
-              onClick={handleFulfill}
-              disabled={actioning}
-              className="px-5 py-2.5 rounded bg-primary text-on-primary font-semibold hover:bg-primary/80 transition-colors disabled:opacity-60"
-            >
-              {actioning ? 'Updating…' : 'Mark as Fulfilled'}
-            </button>
+
+            {!fulfillMode && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setFulfillMode('picked_up')}
+                  className="flex-1 px-4 py-3 rounded border-2 border-secondary text-secondary font-semibold text-body-sm hover:bg-secondary/10 transition-colors"
+                >
+                  <span className="block text-base">🏪</span>
+                  Picked Up
+                  <span className="block text-label-sm font-normal text-on-surface-variant mt-0.5">Enrollee collected in person</span>
+                </button>
+                <button
+                  onClick={() => setFulfillMode('delivered')}
+                  className="flex-1 px-4 py-3 rounded border-2 border-primary text-primary font-semibold text-body-sm hover:bg-primary/10 transition-colors"
+                >
+                  <span className="block text-base">🚚</span>
+                  Delivered
+                  <span className="block text-label-sm font-normal text-on-surface-variant mt-0.5">Medication was delivered</span>
+                </button>
+              </div>
+            )}
+
+            {fulfillMode === 'picked_up' && (
+              <div className="space-y-3">
+                <p className="text-body-sm text-on-surface-variant">Confirm the enrollee picked up their medication in person.</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleFulfill('picked_up')}
+                    disabled={actioning}
+                    className="px-5 py-2.5 rounded bg-secondary text-on-secondary font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-60"
+                  >
+                    {actioning ? 'Submitting…' : 'Confirm Picked Up'}
+                  </button>
+                  <button onClick={() => setFulfillMode(null)} className="px-4 py-2.5 rounded border border-outline text-on-surface-variant text-body-sm hover:bg-surface-container transition-colors">
+                    Back
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {fulfillMode === 'delivered' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-body-sm font-semibold text-on-surface mb-1">Delivery Fee (₦)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g. 1500"
+                    value={deliveryFee}
+                    onChange={e => setDeliveryFee(e.target.value)}
+                    className="w-48 border border-outline rounded px-3 py-2 text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                  <p className="text-label-sm text-on-surface-variant mt-1">This will be added to the total payment.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleFulfill('delivered')}
+                    disabled={actioning}
+                    className="px-5 py-2.5 rounded bg-primary text-on-primary font-semibold hover:bg-primary/80 transition-colors disabled:opacity-60"
+                  >
+                    {actioning ? 'Submitting…' : 'Confirm Delivered'}
+                  </button>
+                  <button onClick={() => setFulfillMode(null)} className="px-4 py-2.5 rounded border border-outline text-on-surface-variant text-body-sm hover:bg-surface-container transition-colors">
+                    Back
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
