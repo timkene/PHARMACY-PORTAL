@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 
 const NAV_ITEMS = [
   { href: '/aggregator/dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { href: '/aggregator/orders',    label: 'Orders',    icon: 'receipt_long' },
 ]
 
 export function AggregatorShell({ children, companyName }: { children: ReactNode; companyName: string }) {

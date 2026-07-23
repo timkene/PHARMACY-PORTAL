@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { AggregatorShell } from '@/components/aggregator/AggregatorShell'
-import { BiddingTable } from '@/components/staff/BiddingTable'
 import { BidForm } from '@/components/aggregator/BidForm'
 import { CountdownTimer } from '@/components/shared/CountdownTimer'
 import { MedicationTag } from '@/components/shared/MedicationTag'
@@ -158,11 +157,7 @@ export default function AggregatorOrderPage() {
         {bidClosed && !isWinner && (
           <div className="bg-surface-container rounded p-5">
             <p className="text-body-sm font-semibold text-on-surface-variant">Session Closed</p>
-            {order.winnerTotalPrice && (
-              <p className="text-body-sm text-on-surface-variant mt-1">
-                Winning price: <span className="font-mono text-code-mono">₦{order.winnerTotalPrice.toLocaleString()}</span>
-              </p>
-            )}
+            <p className="text-body-sm text-on-surface-variant mt-1">This order was awarded to another pharmacy.</p>
           </div>
         )}
 
@@ -214,7 +209,20 @@ export default function AggregatorOrderPage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
-          <BiddingTable bids={bids} reconnecting={reconnecting} />
+          {/* Own bid status */}
+          <div>
+            {bids.length > 0 && (
+              <div className="bg-surface-lowest border border-outline-variant rounded p-5">
+                <p className="text-label-caps text-on-surface-variant uppercase tracking-widest mb-1">Your Bid</p>
+                <p className="font-mono text-code-mono text-on-surface text-title-md">
+                  ₦{bids[0].totalPrice.toLocaleString()}
+                </p>
+                <p className="text-body-sm text-on-surface-variant mt-1">
+                  Submitted {new Date(bids[0].submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-4">
             {status === 'bidding' && <BidForm orderId={id} medications={order.medications} />}

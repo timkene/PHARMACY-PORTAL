@@ -91,6 +91,13 @@ export interface AggregatorDashboard {
   completedOrders: Order[]
 }
 
+export interface AggregatorOrdersResponse {
+  open: Order[]
+  active: Order[]
+  fulfilled: Order[]
+  counts: { open: number; active: number; fulfilled: number }
+}
+
 export interface BidUpdateEvent {
   bids: Bid[]
   cheapestId: string

@@ -8,6 +8,7 @@ import type {
   Medication,
   Provider,
   AggregatorDashboard,
+  AggregatorOrdersResponse,
   SearchResult,
 } from './types'
 
@@ -113,6 +114,9 @@ export const fulfillOrder = (orderId: string) =>
 
 export const getAggregatorDashboard = () =>
   apiFetch<AggregatorDashboard>('/api/aggregator/dashboard')
+
+export const getAggregatorOrders = () =>
+  apiFetch<AggregatorOrdersResponse>('/api/aggregator/orders')
 
 export const placeBid = (orderId: string, unitPrice: number, totalPrice: number) =>
   apiFetch<{ bid: Bid }>(`/api/orders/${orderId}/bids`, {
