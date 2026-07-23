@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 
 interface CountdownTimerProps {
-  endsAt: string
+  endsAt: string | undefined
 }
 
 function formatTime(ms: number): string {
@@ -21,9 +21,10 @@ function parseUtc(s: string): number {
 }
 
 export function CountdownTimer({ endsAt }: CountdownTimerProps) {
-  const [remaining, setRemaining] = useState(() => parseUtc(endsAt) - Date.now())
+  const [remaining, setRemaining] = useState(() => endsAt ? parseUtc(endsAt) - Date.now() : 0)
 
   useEffect(() => {
+    if (!endsAt) return
     const id = setInterval(() => {
       setRemaining(parseUtc(endsAt) - Date.now())
     }, 1000)
