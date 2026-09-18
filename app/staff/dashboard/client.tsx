@@ -10,6 +10,13 @@ import type { Order, OrderStatus } from '@/lib/types'
 const PAGE_SIZE = 20
 
 const STATUS_CHIP_MAP: Record<OrderStatus, { status: 'active' | 'pending' | 'error' | 'info'; label: string }> = {
+  direct_quote_requested: { status: 'pending', label: 'Price Required' },
+  direct_price_review: { status: 'pending', label: 'Direct Price Review' },
+  direct_reassignment: { status: 'error', label: 'Awaiting Reassignment' },
+  clearline_price_review: { status: 'pending', label: 'Price Review' },
+  cancelled: { status: 'error', label: 'Cancelled' },
+  post_fulfilment_recalled: { status: 'error', label: 'Recalled After Fulfilment' },
+  fulfilled: { status: 'info', label: 'Fulfilled' },
   pending_review:        { status: 'pending', label: 'Awaiting Review' },
   rejected:              { status: 'error',   label: 'Rejected' },
   bidding:               { status: 'active',  label: 'Bidding' },

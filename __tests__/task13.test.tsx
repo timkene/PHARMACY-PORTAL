@@ -1,412 +1,211 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import React from 'react'
-
-// --- Mocks ---
-
-const mockPush = vi.fn()
-
-vi.mock('next/navigation', () => ({
-  useParams: () => ({ id: 'order-1' }),
-  useRouter: () => ({ push: mockPush }),
-  usePathname: () => '/aggregator/orders/order-1',
-}))
-
-vi.mock('next/link', () => ({
-  default: ({
-    href,
-    children,
-    className,
-  }: {
-    href: string
-    children: React.ReactNode
-    className?: string
-  }) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
-}))
-
-const mockPlaceBid = vi.fn()
-const mockVerifyCollection = vi.fn()
-const mockGetOrder = vi.fn()
-const mockLogout = vi.fn()
-
-vi.mock('@/lib/api', () => {
-  class ApiError extends Error {
-    status: number
-    constructor(status: number, message: string) {
-      super(message)
-      this.name = 'ApiError'
-      this.status = status
-    }
-  }
-  return {
-    placeBid: (...args: unknown[]) => mockPlaceBid(...args),
-    verifyCollection: (...args: unknown[]) => mockVerifyCollection(...args),
-    getOrder: (...args: unknown[]) => mockGetOrder(...args),
-    logout: (...args: unknown[]) => mockLogout(...args),
-    ApiError,
-  }
-})
-
-vi.mock('@/lib/sse', () => ({
-  useOrderStream: vi.fn(),
-}))
-
-vi.mock('@/components/staff/BiddingTable', () => ({
-  BiddingTable: () => <div data-testid="bidding-table" />,
-}))
-
-vi.mock('@/components/shared/CountdownTimer', () => ({
-  CountdownTimer: () => <div data-testid="countdown-timer" />,
-}))
-
-vi.mock('@/components/shared/MedicationTag', () => ({
-  MedicationTag: ({ med }: { med: { name: string } }) => (
-    <span data-testid="med-tag">{med.name}</span>
-  ),
-}))
-
-vi.mock('@/components/shared/CodeWidget', () => ({
-  CodeWidget: ({ code }: { code: string; label: string }) => (
-    <div data-testid="code-widget">{code}</div>
-  ),
-}))
-
-// Import after mocks are set up
-import { BidForm } from '@/components/aggregator/BidForm'
-import { CollectionVerifier } from '@/components/aggregator/CollectionVerifier'
-import AggregatorOrderPage from '@/app/aggregator/orders/[id]/page'
-import { ApiError } from '@/lib/api'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import type { Order } from '@/lib/types'
 
-// ---- Fixtures ----
+vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'order-1' }) }))
+vi.mock('@/components/aggregator/AggregatorShell', () => ({
+  AggregatorShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}))
+vi.mock('@/components/shared/CountdownTimer', () => ({ CountdownTimer: () => <span>Countdown</span> }))
+vi.mock('@/lib/sse', () => ({ useOrderStream: vi.fn() }))
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
+  getOrder: vi.fn(), submitDirectQuote: vi.fn(), acceptOrder: vi.fn(), fulfillOrder: vi.fn(), placeBid: vi.fn(),
+}))
+import OrderPage from '@/app/aggregator/orders/[id]/page'
+import { getOrder, submitDirectQuote, acceptOrder, fulfillOrder, placeBid, ApiError } from '@/lib/api'
+import { useOrderStream } from '@/lib/sse'
 
-function makeOrder(overrides: Partial<Order> = {}): Order {
+const medication = { name: 'Synthetic medicine', dosage: '5mg', quantity: 2, tablets: 1, frequency: '' as const, durationDays: 1, diagnosis: 'Synthetic diagnosis' }
+function order(overrides: Partial<Order> = {}): Order {
   return {
-    id: 'order-1',
-    intakeId: 'INT-001',
-    enrollee: {
-      fullName: 'Jane Doe',
-      email: 'jane@example.com',
-      phone: '0800000',
-      address: '1 St',
-    },
-    diagnosis: 'Hypertension',
-    medications: [
-      { name: 'Amlodipine', dosage: '5mg', quantity: 1 },
-      { name: 'Lisinopril', dosage: '10mg', quantity: 1 },
-    ],
-    status: 'bidding',
-    bids: [],
-    biddingEndsAt: new Date(Date.now() + 60_000).toISOString(),
-    createdAt: new Date().toISOString(),
-    ...overrides,
+    id: 'order-1', intakeId: 'TEST-1', enrollee: { enrolleeId: 'EN-1', fullName: 'Synthetic Patient' },
+    medications: [medication], bids: [], createdAt: '2026-01-01', assignmentType: 'direct',
+    status: 'direct_quote_requested', version: 4, assignmentVersion: 1, ...overrides,
   }
 }
-
-function makeGetOrderResponse(orderOverrides: Partial<Order> = {}) {
-  const order = makeOrder(orderOverrides)
-  return {
-    order,
-    bids: [],
-    status: order.status,
-  }
+function response(value: Order) { return { order: value, bids: value.bids, status: value.status } }
+function serve(value: Order) { vi.mocked(getOrder).mockResolvedValue(response(value)) }
+function stream() { return vi.mocked(useOrderStream).mock.calls.at(-1)![1] }
+async function show(value = order()) {
+  serve(value)
+  render(<OrderPage />)
+  await screen.findByText('TEST-1')
 }
+function quote(value = '1250.50') {
+  fireEvent.change(screen.getByLabelText('Total Price / Cost (₦)'), { target: { value } })
+  fireEvent.submit(screen.getByRole('button', { name: 'Submit Price' }).closest('form')!)
+}
+const approved = () => order({ status: 'awaiting_fulfillment', winnerTotalPrice: 1200, priceApprovedAt: '2026-01-01' })
 
-// ---- BidForm tests ----
+beforeEach(() => { vi.resetAllMocks() })
 
-describe('BidForm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+describe('aggregator direct assignment', () => {
+  it('renders an order-level price form without competitive bid fields or Accept', async () => {
+    await show()
+    expect(screen.getByText('Direct Assignment')).toBeInTheDocument()
+    expect(screen.getByLabelText('Total Price / Cost (₦)')).toBeRequired()
+    expect(screen.queryByText('Place Your Bid')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Accept Order' })).not.toBeInTheDocument()
   })
 
-  it('renders unit price and total price fields', () => {
-    render(<BidForm orderId="order-1" />)
-    expect(screen.getByLabelText(/unit price per medication/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/total aggregate price/i)).toBeInTheDocument()
+  it('submits totalPrice and order version once, then refetches the waiting state', async () => {
+    await show()
+    let resolve!: (value: Awaited<ReturnType<typeof submitDirectQuote>>) => void
+    vi.mocked(submitDirectQuote).mockImplementation(() => new Promise(r => { resolve = r }))
+    quote()
+    expect(screen.getByRole('button', { name: 'Submitting…' })).toBeDisabled()
+    fireEvent.submit(screen.getByRole('button', { name: 'Submitting…' }).closest('form')!)
+    expect(submitDirectQuote).toHaveBeenCalledExactlyOnceWith('order-1', { totalPrice: 1250.5, expectedVersion: 4 })
+    serve(order({ status: 'direct_price_review', version: 5, directQuote: { totalPrice: 1250.5, submittedAt: '2026-01-01', aggregatorId: 'A', assignmentVersion: 1 } }))
+    await act(async () => resolve({ success: true, status: 'direct_price_review', version: 5, assignmentVersion: 1 }))
+    await screen.findByText(/Submitted price: ₦1,250.5/)
+    expect(getOrder).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: 'Submit Price' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Accept Order' })).not.toBeInTheDocument()
   })
 
-  it('calls placeBid(orderId, unitPrice, totalPrice) on submit with numeric values', async () => {
-    mockPlaceBid.mockResolvedValue(undefined)
-    render(<BidForm orderId="order-99" />)
-
-    fireEvent.change(screen.getByLabelText(/unit price per medication/i), {
-      target: { value: '500' },
-    })
-    fireEvent.change(screen.getByLabelText(/total aggregate price/i), {
-      target: { value: '15000' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /submit bid/i }))
-
-    await waitFor(() => {
-      expect(mockPlaceBid).toHaveBeenCalledWith('order-99', 500, 15000)
-    })
+  it.each(['0', '-1', '', 'invalid', 'Infinity', '1e309'])('blocks invalid price %s', async value => {
+    await show()
+    quote(value)
+    expect(submitDirectQuote).not.toHaveBeenCalled()
+    expect(screen.getByText('Enter a total price greater than zero.')).toBeInTheDocument()
   })
 
-  it('shows "Bid Submitted" confirmation with formatted total after success', async () => {
-    mockPlaceBid.mockResolvedValue(undefined)
-    render(<BidForm orderId="order-1" />)
-
-    fireEvent.change(screen.getByLabelText(/unit price per medication/i), {
-      target: { value: '250' },
-    })
-    fireEvent.change(screen.getByLabelText(/total aggregate price/i), {
-      target: { value: '15000' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /submit bid/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText('Bid Submitted')).toBeInTheDocument()
-      expect(screen.getByText(/15,000/)).toBeInTheDocument()
-    })
+  it('shows submitted quote and a waiting state without editable actions', async () => {
+    await show(order({ status: 'direct_price_review', directQuote: { totalPrice: 999, submittedAt: '2026-01-01', aggregatorId: 'A', assignmentVersion: 1 } }))
+    expect(screen.getByText('Price submitted — awaiting Clearline approval')).toBeInTheDocument()
+    expect(screen.getByText('Submitted price: ₦999')).toBeInTheDocument()
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Accept|Fulfil|Submit/ })).not.toBeInTheDocument()
   })
 
-  it('"Update Bid" button re-shows the form', async () => {
-    mockPlaceBid.mockResolvedValue(undefined)
-    render(<BidForm orderId="order-1" />)
-
-    fireEvent.change(screen.getByLabelText(/unit price per medication/i), {
-      target: { value: '100' },
-    })
-    fireEvent.change(screen.getByLabelText(/total aggregate price/i), {
-      target: { value: '5000' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /submit bid/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText('Bid Submitted')).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByText('Update Bid'))
-    expect(screen.getByRole('button', { name: /submit bid/i })).toBeInTheDocument()
+  it('accepts with current version and fulfils with the newly fetched version', async () => {
+    await show(approved())
+    serve(order({ status: 'accepted', version: 5 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Accept Order' }))
+    await screen.findByText('Order Accepted')
+    expect(acceptOrder).toHaveBeenCalledExactlyOnceWith('order-1', { expectedVersion: 4 })
+    expect(getOrder).toHaveBeenCalledTimes(2)
+    fireEvent.click(screen.getByRole('button', { name: /Picked Up/ }))
+    serve(order({ status: 'completed', version: 6 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Picked Up' }))
+    await screen.findByText('Order Completed')
+    expect(fulfillOrder).toHaveBeenCalledExactlyOnceWith('order-1', 'picked_up', undefined, { expectedVersion: 5 })
+    expect(getOrder).toHaveBeenCalledTimes(3)
   })
 
-  it('shows ApiError message on failure with role="alert"', async () => {
-    mockPlaceBid.mockRejectedValue(new ApiError(400, 'Bid window has closed'))
-    render(<BidForm orderId="order-1" />)
-
-    fireEvent.change(screen.getByLabelText(/unit price per medication/i), {
-      target: { value: '100' },
-    })
-    fireEvent.change(screen.getByLabelText(/total aggregate price/i), {
-      target: { value: '5000' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /submit bid/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Bid window has closed')
-    })
+  it('blocks duplicate Accept while pending', async () => {
+    await show(approved())
+    vi.mocked(acceptOrder).mockReturnValue(new Promise(() => {}))
+    const button = screen.getByRole('button', { name: 'Accept Order' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(button).toBeDisabled()
+    expect(acceptOrder).toHaveBeenCalledTimes(1)
   })
 
-  it('shows "Bidding has ended" when disabled={true}', () => {
-    render(<BidForm orderId="order-1" disabled={true} />)
-    expect(screen.getByText(/bidding has ended for this session/i)).toBeInTheDocument()
+  it('supports legacy accepted direct orders with version zero and zero delivery fee; blocks duplicate fulfilment', async () => {
+    await show(order({ status: 'accepted', version: undefined }))
+    fireEvent.click(screen.getByRole('button', { name: /Delivered/ }))
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } })
+    vi.mocked(fulfillOrder).mockReturnValue(new Promise(() => {}))
+    const button = screen.getByRole('button', { name: 'Confirm Delivered' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(button).toBeDisabled()
+    expect(fulfillOrder).toHaveBeenCalledExactlyOnceWith('order-1', 'delivered', 0, { expectedVersion: 0 })
+  })
+
+  it('does not accept legacy direct orders without explicit approval', async () => {
+    await show(order({ status: 'awaiting_fulfillment', winnerTotalPrice: 500 }))
+    expect(screen.queryByRole('button', { name: 'Accept Order' })).not.toBeInTheDocument()
+    expect(screen.getByText(/needs Clearline price approval/)).toBeInTheDocument()
+  })
+
+  it('refreshes on 409 without replay and requires a new user action', async () => {
+    await show()
+    vi.mocked(submitDirectQuote).mockRejectedValue(new ApiError(409, 'Conflict'))
+    serve(order({ version: 8 }))
+    quote()
+    await screen.findByText('This order changed. Review the refreshed order before trying again.')
+    await waitFor(() => expect(getOrder).toHaveBeenCalledTimes(2))
+    expect(submitDirectQuote).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Submit Price' })).toBeEnabled())
+    quote('2000')
+    await waitFor(() => expect(submitDirectQuote).toHaveBeenLastCalledWith('order-1', { totalPrice: 2000, expectedVersion: 8 }))
+  })
+
+  it.each([403, 404])('clears prescription and controls on mutation HTTP %s', async code => {
+    await show()
+    vi.mocked(submitDirectQuote).mockRejectedValue(new ApiError(code, 'Private staff reason'))
+    quote()
+    await screen.findByText('Assignment no longer available.')
+    expect(screen.queryByText('Synthetic Patient')).not.toBeInTheDocument()
+    expect(screen.queryByText('Private staff reason')).not.toBeInTheDocument()
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+  })
+
+  it.each(['direct_reassignment', 'cancelled', 'post_fulfilment_recalled'] as const)('leaves no actions for %s', async status => {
+    serve(order({ status }))
+    render(<OrderPage />)
+    await screen.findByText(/no longer (available|active)/)
+    expect(screen.queryByRole('button', { name: /Accept|Submit Price|Confirm|Picked Up|Delivered/ })).not.toBeInTheDocument()
+  })
+
+  it('clears on access_revoked and ignores an older in-flight GET', async () => {
+    await show()
+    let resolve!: (value: Awaited<ReturnType<typeof getOrder>>) => void
+    vi.mocked(getOrder).mockImplementation(() => new Promise(r => { resolve = r }))
+    act(() => stream().onOrderChanged?.())
+    act(() => stream().onAccessRevoked?.())
+    await screen.findByText('Assignment no longer available.')
+    await act(async () => resolve(response(approved())))
+    expect(screen.queryByText('Synthetic Patient')).not.toBeInTheDocument()
+    expect(vi.mocked(useOrderStream).mock.calls.at(-1)![0]).toBeNull()
+  })
+
+  it('refetches approval on order_changed and refreshes on focus', async () => {
+    await show(order({ status: 'direct_price_review' }))
+    serve(approved())
+    act(() => stream().onOrderChanged?.())
+    await screen.findByRole('button', { name: 'Accept Order' })
+    serve(order({ status: 'direct_reassignment' }))
+    fireEvent(window, new Event('focus'))
+    await screen.findByText('Assignment no longer available.')
+  })
+
+  it('leaves actions disabled when post-mutation refresh fails', async () => {
+    await show(approved())
+    vi.mocked(getOrder).mockRejectedValue(new ApiError(503, 'Service unavailable'))
+    fireEvent.click(screen.getByRole('button', { name: 'Accept Order' }))
+    await screen.findByText('Service unavailable')
+    expect(screen.getByRole('button', { name: 'Accept Order' })).toBeDisabled()
+    expect(acceptOrder).toHaveBeenCalledTimes(1)
   })
 })
 
-// ---- CollectionVerifier tests ----
-
-describe('CollectionVerifier', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+describe('competitive compatibility', () => {
+  it.each(['competitive', undefined] as const)('keeps the existing medication bid form for assignmentType %s', async assignmentType => {
+    await show(order({ assignmentType, status: 'bidding', enrollee: { enrolleeId: '', fullName: 'Hidden' } }))
+    expect(screen.getByText('Place Your Bid')).toBeInTheDocument()
+    expect(screen.queryByText('Direct Assignment')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '250' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Bid' }))
+    await screen.findByText('Bid Submitted')
+    expect(placeBid).toHaveBeenCalledExactlyOnceWith('order-1', 0, 500)
+    expect(submitDirectQuote).not.toHaveBeenCalled()
   })
 
-  it('renders the code input and submit button', () => {
-    render(<CollectionVerifier orderId="order-1" />)
-    expect(screen.getByPlaceholderText('XXX-XXX')).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /verify & mark as fulfilled/i })
-    ).toBeInTheDocument()
-  })
-
-  it('calls verifyCollection(orderId, code.toUpperCase()) on submit', async () => {
-    mockVerifyCollection.mockResolvedValue(undefined)
-    render(<CollectionVerifier orderId="order-77" />)
-
-    fireEvent.change(screen.getByPlaceholderText('XXX-XXX'), {
-      target: { value: 'abc123' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /verify & mark as fulfilled/i }))
-
-    await waitFor(() => {
-      expect(mockVerifyCollection).toHaveBeenCalledWith('order-77', 'ABC123')
-    })
-  })
-
-  it('shows "Verified — HMO has been notified." on success', async () => {
-    mockVerifyCollection.mockResolvedValue(undefined)
-    render(<CollectionVerifier orderId="order-1" />)
-
-    fireEvent.change(screen.getByPlaceholderText('XXX-XXX'), {
-      target: { value: 'XYZ999' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /verify & mark as fulfilled/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/verified — hmo has been notified/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows "Invalid code. Please check with the enrollee." when ApiError with status 400', async () => {
-    mockVerifyCollection.mockRejectedValue(new ApiError(400, 'Invalid code'))
-    render(<CollectionVerifier orderId="order-1" />)
-
-    fireEvent.change(screen.getByPlaceholderText('XXX-XXX'), {
-      target: { value: 'WRONG1' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /verify & mark as fulfilled/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Invalid code. Please check with the enrollee.'
-      )
-    })
-  })
-
-  it('shows "Verification failed. Try again." on non-400 error', async () => {
-    mockVerifyCollection.mockRejectedValue(new ApiError(500, 'Server error'))
-    render(<CollectionVerifier orderId="order-1" />)
-
-    fireEvent.change(screen.getByPlaceholderText('XXX-XXX'), {
-      target: { value: 'FAIL01' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /verify & mark as fulfilled/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Verification failed. Try again.')
-    })
-  })
-
-  it('shows CodeWidget with approvalCode when approvalCode prop is set', () => {
-    render(<CollectionVerifier orderId="order-1" approvalCode="APR-789" />)
-    expect(screen.getByTestId('code-widget')).toBeInTheDocument()
-    expect(screen.getByTestId('code-widget')).toHaveTextContent('APR-789')
-  })
-
-  it('does NOT render CodeWidget when approvalCode is undefined', () => {
-    render(<CollectionVerifier orderId="order-1" />)
-    expect(screen.queryByTestId('code-widget')).not.toBeInTheDocument()
-  })
-})
-
-// ---- AggregatorOrderPage tests ----
-
-describe('AggregatorOrderPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('shows skeleton while loading', () => {
-    mockGetOrder.mockReturnValue(new Promise(() => {})) // never resolves
-    render(<AggregatorOrderPage />)
-    const skeletons = document.querySelectorAll('.animate-pulse')
-    expect(skeletons.length).toBeGreaterThan(0)
-  })
-
-  it('calls getOrder(id) on mount', async () => {
-    mockGetOrder.mockResolvedValue(makeGetOrderResponse())
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(mockGetOrder).toHaveBeenCalledWith('order-1')
-    })
-  })
-
-  it('renders prescription summary (intakeId, enrollee name, diagnosis)', async () => {
-    mockGetOrder.mockResolvedValue(
-      makeGetOrderResponse({
-        intakeId: 'INT-555',
-        enrollee: {
-          fullName: 'John Smith',
-          email: 'j@test.com',
-          phone: '0800',
-          address: '1 St',
-        },
-        diagnosis: 'Type 2 Diabetes',
-      })
-    )
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(screen.getByText('INT-555')).toBeInTheDocument()
-      expect(screen.getByText('John Smith')).toBeInTheDocument()
-      expect(screen.getByText('Type 2 Diabetes')).toBeInTheDocument()
-    })
-  })
-
-  it('shows countdown banner and BidForm when status is bidding', async () => {
-    mockGetOrder.mockResolvedValue(makeGetOrderResponse({ status: 'bidding' }))
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(screen.getByTestId('countdown-timer')).toBeInTheDocument()
-      expect(screen.getByText(/place your bid/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows "You Were Selected" banner when bidClosed and isWinner', async () => {
-    mockGetOrder.mockResolvedValue({
-      order: makeOrder({
-        status: 'awaiting_fulfillment',
-        winnerId: 'agg-1',
-        winnerName: 'BestPharm',
-        winnerTotalPrice: 20000,
-      }),
-      bids: [],
-      status: 'awaiting_fulfillment',
-    })
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(screen.getByText('You Were Selected')).toBeInTheDocument()
-    })
-  })
-
-  it('shows "Session Closed" banner when bidClosed and not winner', async () => {
-    mockGetOrder.mockResolvedValue({
-      order: makeOrder({ status: 'awaiting_fulfillment', winnerTotalPrice: 20000 }),
-      bids: [],
-      status: 'awaiting_fulfillment',
-    })
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(screen.getByText('Session Closed')).toBeInTheDocument()
-    })
-  })
-
-  it('shows CollectionVerifier when status is awaiting_fulfillment and isWinner', async () => {
-    mockGetOrder.mockResolvedValue({
-      order: makeOrder({
-        status: 'awaiting_fulfillment',
-        winnerId: 'agg-1',
-        winnerName: 'BestPharm',
-      }),
-      bids: [],
-      status: 'awaiting_fulfillment',
-    })
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(screen.getByText(/aggregator verification/i)).toBeInTheDocument()
-    })
-  })
-
-  it('does NOT show CollectionVerifier when not winner', async () => {
-    mockGetOrder.mockResolvedValue({
-      order: makeOrder({ status: 'awaiting_fulfillment' }),
-      bids: [],
-      status: 'awaiting_fulfillment',
-    })
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(screen.getByText('Session Closed')).toBeInTheDocument()
-    })
-    expect(screen.queryByText(/aggregator verification/i)).not.toBeInTheDocument()
-  })
-
-  it('shows Toast on API load error', async () => {
-    mockGetOrder.mockRejectedValue(new ApiError(500, 'Order not found'))
-    render(<AggregatorOrderPage />)
-    await waitFor(() => {
-      expect(screen.getByText('Order not found')).toBeInTheDocument()
-    })
+  it('keeps competitive acceptance and fulfilment calls without expectedVersion', async () => {
+    await show(order({ assignmentType: 'competitive', status: 'awaiting_fulfillment' }))
+    serve(order({ assignmentType: 'competitive', status: 'accepted' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Accept Order' }))
+    await screen.findByText('Order Accepted')
+    expect(acceptOrder).toHaveBeenCalledExactlyOnceWith('order-1')
+    fireEvent.click(screen.getByRole('button', { name: /Picked Up/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Picked Up' }))
+    await waitFor(() => expect(fulfillOrder).toHaveBeenCalledExactlyOnceWith('order-1', 'picked_up', undefined))
   })
 })

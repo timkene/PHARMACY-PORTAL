@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { AssignmentStatus } from '@/components/aggregator/AssignmentStatus'
 import { AggregatorShell } from '@/components/aggregator/AggregatorShell'
 import { OrderCard } from '@/components/aggregator/OrderCard'
 import { Toast } from '@/components/shared/Toast'
@@ -16,14 +17,18 @@ export default function AggregatorDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
 
+  const request = useRef(0)
   const load = useCallback(async () => {
+    const sequence = ++request.current
     try {
       const d = await getAggregatorDashboard()
-      setData(d)
+      if (sequence === request.current) setData(d)
     } catch (err) {
+      if (sequence !== request.current) return
+      setData(null)
       setToast(err instanceof ApiError ? err.message : 'Failed to load dashboard')
     } finally {
-      setLoading(false)
+      if (sequence === request.current) setLoading(false)
     }
   }, [])
 
@@ -31,14 +36,29 @@ export default function AggregatorDashboardPage() {
 
   // Poll every 15 s so new bidding sessions appear without a manual refresh
   useEffect(() => {
+    const invalidate = () => { request.current++ }
     const id = setInterval(load, 15_000)
-    return () => clearInterval(id)
+    window.addEventListener('focus', load)
+    window.addEventListener('online', load)
+    return () => {
+      invalidate()
+      clearInterval(id)
+      window.removeEventListener('focus', load)
+      window.removeEventListener('online', load)
+    }
   }, [load])
 
   return (
     <AggregatorShell companyName="Your Pharmacy">
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       <div className="p-8 space-y-10">
+        {data && <section>
+          <SectionHeader title="Direct Assignments" />
+          <p className="text-body-sm text-on-surface-variant">
+            {data.wonOrders.filter(o => o.assignmentType === 'direct' && o.status === 'direct_quote_requested').length} awaiting price submission
+            {' · '}{data.wonOrders.filter(o => o.assignmentType === 'direct' && o.status === 'direct_price_review').length} awaiting Clearline approval
+          </p>
+        </section>}
         {/* Open Bidding */}
         <section>
           <SectionHeader title="Open Bidding Sessions" />
@@ -65,6 +85,7 @@ export default function AggregatorDashboardPage() {
                   <div>
                     <p className="font-mono text-code-mono text-on-surface">{order.intakeId}</p>
                     <p className="text-body-sm text-on-surface-variant">{order.enrollee.fullName}</p>
+                    <AssignmentStatus order={order} />
                   </div>
                   <Link
                     href={`/aggregator/orders/${order.id}`}
@@ -105,7 +126,7 @@ export default function AggregatorDashboardPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-body-sm text-on-surface-variant capitalize">
-                          {order.status.replace(/_/g, ' ')}
+                          <AssignmentStatus order={order} />
                         </span>
                       </td>
                     </tr>

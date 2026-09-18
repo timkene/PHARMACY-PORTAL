@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { AssignmentStatus } from '@/components/aggregator/AssignmentStatus'
 import { AggregatorShell } from '@/components/aggregator/AggregatorShell'
 import { CountdownTimer } from '@/components/shared/CountdownTimer'
 import { Toast } from '@/components/shared/Toast'
@@ -8,14 +9,6 @@ import { getAggregatorOrders, ApiError } from '@/lib/api'
 import type { AggregatorOrdersResponse, Order } from '@/lib/types'
 
 type Tab = 'open' | 'active' | 'fulfilled'
-
-const STATUS_LABEL: Record<string, string> = {
-  awaiting_fulfillment:  'Awaiting Acceptance',
-  accepted:              'Accepted',
-  awaiting_confirmation: 'Awaiting Confirmation',
-  completed:             'Completed',
-  bidding:               'Bidding',
-}
 
 function TabBtn({ id, active, label, count, onClick }: {
   id: Tab; active: boolean; label: string; count: number; onClick: () => void
@@ -75,7 +68,7 @@ function ActiveOrderRow({ order }: { order: Order }) {
       </div>
       <div className="flex items-center gap-4 shrink-0 ml-4">
         <span className="text-body-sm text-secondary font-semibold">
-          {STATUS_LABEL[order.status] ?? order.status}
+          <AssignmentStatus order={order} />
         </span>
         <Link
           href={`/aggregator/orders/${order.id}`}
@@ -95,7 +88,7 @@ function FulfilledTable({ orders }: { orders: Order[] }) {
       <table className="w-full">
         <thead>
           <tr className="border-b border-outline-variant">
-            {['Order ID', 'Enrollee', 'Date', 'Your Earnings'].map(h => (
+            {['Order ID', 'Enrollee', 'Date', 'Your Earnings', 'Status'].map(h => (
               <th key={h} className="px-4 py-3 text-left text-label-caps text-on-surface-variant uppercase tracking-widest">
                 {h}
               </th>
@@ -113,6 +106,7 @@ function FulfilledTable({ orders }: { orders: Order[] }) {
               <td className="px-4 py-3 font-mono text-code-mono text-on-surface font-semibold">
                 {o.winnerTotalPrice != null ? `₦${o.winnerTotalPrice.toLocaleString()}` : '—'}
               </td>
+              <td className="px-4 py-3"><AssignmentStatus order={o} /></td>
             </tr>
           ))}
         </tbody>
@@ -127,20 +121,33 @@ export default function AggregatorOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
 
+  const request = useRef(0)
   const load = useCallback(async () => {
+    const sequence = ++request.current
     try {
-      setData(await getAggregatorOrders())
+      const d = await getAggregatorOrders()
+      if (sequence === request.current) setData(d)
     } catch (err) {
+      if (sequence !== request.current) return
+      setData(null)
       setToast(err instanceof ApiError ? err.message : 'Failed to load orders')
     } finally {
-      setLoading(false)
+      if (sequence === request.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
+    const invalidate = () => { request.current++ }
     const id = setInterval(load, 5_000)
-    return () => clearInterval(id)
+    window.addEventListener('focus', load)
+    window.addEventListener('online', load)
+    return () => {
+      invalidate()
+      clearInterval(id)
+      window.removeEventListener('focus', load)
+      window.removeEventListener('online', load)
+    }
   }, [load])
 
   const counts = data?.counts ?? { open: 0, active: 0, fulfilled: 0 }

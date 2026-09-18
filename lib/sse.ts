@@ -6,9 +6,14 @@ import type {
   OrderCompletedEvent,
 } from './types'
 
+import { API_BASE } from './api'
+
 const MAX_BACKOFF_MS = 30_000
 
 interface StreamHandlers {
+  onOrderChanged?: () => void
+  onAccessRevoked?: () => void
+  onConnected?: () => void
   onBidUpdate?: (e: BidUpdateEvent) => void
   onSessionClosed?: (e: SessionClosedEvent) => void
   onOrderAccepted?: (e: OrderAcceptedEvent) => void
@@ -29,12 +34,25 @@ export function useOrderStream(orderId: string | null, handlers: StreamHandlers)
   const connect = useCallback(() => {
     if (!orderId) return
 
-    const base = process.env.NEXT_PUBLIC_API_URL ?? ''
+    const base = process.env.NEXT_PUBLIC_API_URL ?? API_BASE
     const es = new EventSource(
       `${base}/api/orders/${orderId}/stream`,
       { withCredentials: true }
     )
     esRef.current = es
+    let revoked = false
+    es.onopen = () => {
+      backoffRef.current = 1000
+      handlersRef.current.onReconnecting?.(false)
+      handlersRef.current.onConnected?.()
+    }
+    es.addEventListener('order_changed', () => handlersRef.current.onOrderChanged?.())
+    es.addEventListener('access_revoked', () => {
+      revoked = true
+      clearTimeout(timerRef.current)
+      es.close()
+      handlersRef.current.onAccessRevoked?.()
+    })
 
     es.addEventListener('bid_update', (e: MessageEvent) => {
       backoffRef.current = 1000
@@ -67,6 +85,7 @@ export function useOrderStream(orderId: string | null, handlers: StreamHandlers)
 
     es.onerror = () => {
       es.close()
+      if (revoked || esRef.current !== es) return
       handlersRef.current.onReconnecting?.(true)
       timerRef.current = setTimeout(() => {
         backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS)
@@ -80,6 +99,7 @@ export function useOrderStream(orderId: string | null, handlers: StreamHandlers)
     return () => {
       clearTimeout(timerRef.current)
       esRef.current?.close()
+      esRef.current = null
     }
   }, [connect])
 }

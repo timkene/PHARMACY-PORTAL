@@ -41,6 +41,13 @@ export interface Bid {
 }
 
 export type OrderStatus =
+  | 'direct_quote_requested'
+  | 'direct_price_review'
+  | 'direct_reassignment'
+  | 'clearline_price_review'
+  | 'cancelled'
+  | 'post_fulfilment_recalled'
+  | 'fulfilled'
   | 'pending_review'
   | 'rejected'
   | 'bidding'
@@ -49,6 +56,24 @@ export type OrderStatus =
   | 'awaiting_confirmation'
   | 'completed'
   | 'not_received'
+
+export interface ExpectedVersion { expectedVersion: number }
+
+export interface DirectQuoteRequest extends ExpectedVersion { totalPrice: number }
+
+export interface LifecycleResponse {
+  success: boolean
+  status: OrderStatus
+  version: number
+  assignmentVersion: number
+}
+
+export interface DirectQuote {
+  totalPrice: number
+  submittedAt: string
+  aggregatorId: string
+  assignmentVersion: number
+}
 
 export interface Order {
   id: string
@@ -61,12 +86,27 @@ export interface Order {
   bids: Bid[]
   winnerId?: string
   winnerName?: string
-  winnerTotalPrice?: number
+  assignmentType?: 'direct' | 'competitive'
+  version?: number
+  assignmentVersion?: number
+  directQuote?: DirectQuote | null
+  priceApprovedAt?: string | null
+  acceptedAt?: string | null
+  fulfilledAt?: string | null
+  cancelledAt?: string | null
+  recalledAt?: string | null
+  winnerTotalPrice?: number | null
   fulfillmentType?: 'delivered' | 'picked_up'
   deliveryFee?: number
   biddingEndsAt?: string
   createdAt: string
   completedAt?: string
+}
+
+export interface StaffIdentity {
+  userId: string
+  name: string
+  email: string
 }
 
 export interface StaffUser {
@@ -126,4 +166,9 @@ export interface OrderCompletedEvent {
 export interface SearchResult {
   code: string
   label: string
+}
+
+/** Direct approval is supplied by the backend, independently of lifecycle status. */
+export function isDirectApproved(order: Pick<Order, 'assignmentType' | 'priceApprovedAt' | 'winnerTotalPrice'>): boolean {
+  return order.assignmentType === 'direct' && !!order.priceApprovedAt && order.winnerTotalPrice != null
 }

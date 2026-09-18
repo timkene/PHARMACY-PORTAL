@@ -82,3 +82,22 @@ describe('useOrderStream', () => {
     vi.useRealTimers()
   })
 })
+
+it('refetches on order_changed and closes without reconnecting on access_revoked', () => {
+  vi.useFakeTimers()
+  const onOrderChanged = vi.fn()
+  const onAccessRevoked = vi.fn()
+  const hook = renderHook(() => useOrderStream('direct-1', { onOrderChanged, onAccessRevoked }))
+  act(() => instances[0].emit('order_changed', { refresh: true }))
+  expect(onOrderChanged).toHaveBeenCalledOnce()
+  act(() => instances[0].emit('access_revoked', {}))
+  expect(onAccessRevoked).toHaveBeenCalledOnce()
+  expect(instances[0].readyState).toBe(MockEventSource.CLOSED)
+  act(() => {
+    instances[0].triggerError()
+    vi.advanceTimersByTime(60_000)
+  })
+  expect(instances).toHaveLength(1)
+  hook.unmount()
+  vi.useRealTimers()
+})

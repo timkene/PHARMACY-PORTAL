@@ -1,5 +1,9 @@
 import type {
+  DirectQuoteRequest,
+  ExpectedVersion,
+  LifecycleResponse,
   StaffUser,
+  StaffIdentity,
   AggregatorUser,
   Order,
   Bid,
@@ -12,7 +16,7 @@ import type {
   SearchResult,
 } from './types'
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://pharmacy-dispatch-api.onrender.com'
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://pharmacy-dispatch-api.onrender.com'
 
 function setDomainCookie(name: string, value: string) {
   if (typeof document === 'undefined') return
@@ -32,17 +36,46 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new ApiError(res.status, (data as { message?: string }).message ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined' &&
+        window.location.pathname.startsWith('/staff/') &&
+        window.location.pathname !== '/staff/login' &&
+        (!path.startsWith('/api/auth/') || path === '/api/auth/staff/me')) {
+      clearDomainCookie('staff_session')
+      window.location.assign('/staff/login')
+    }
+    if (res.status === 401 && typeof window !== 'undefined' &&
+        window.location.pathname.startsWith('/aggregator/') &&
+        !path.startsWith('/api/auth/')) {
+      clearDomainCookie('aggregator_session')
+      window.location.assign('/aggregator/login')
+    }
+    const error = data as { message?: unknown; detail?: unknown }
+    const message = typeof error.message === 'string' ? error.message
+      : typeof error.detail === 'string' ? error.detail : 'Please check your request and try again.'
+    throw new ApiError(res.status, res.status >= 500 ? 'Service unavailable. Please try again.' : message)
+  }
   return data as T
 }
 
 // Auth
+export const getStaffIdentity = async (headers?: HeadersInit): Promise<StaffIdentity> => {
+  const data = await apiFetch<StaffIdentity>('/api/auth/staff/me', {
+    credentials: 'include', cache: 'no-store', redirect: 'error',
+    ...(headers ? { headers } : {}),
+  })
+  if (!data || typeof data.userId !== 'string' || typeof data.name !== 'string' || typeof data.email !== 'string') {
+    throw new Error('Invalid staff identity response')
+  }
+  return { userId: data.userId, name: data.name, email: data.email }
+}
+
 export const staffLogin = async (email: string, password: string) => {
   const data = await apiFetch<{ user: StaffUser; session: string }>('/api/auth/staff/login', {
     method: 'POST',
@@ -101,22 +134,31 @@ export const deleteOrder = (id: string) =>
   apiFetch<{ success: boolean }>(`/api/orders/${id}`, { method: 'DELETE' })
 
 export const getOrder = async (id: string): Promise<{ order: Order; bids: Bid[]; status: OrderStatus }> => {
-  const order = await apiFetch<Order>(`/api/orders/${id}`)
+  const order = await apiFetch<Order>(`/api/orders/${id}`, { cache: 'no-store' })
   return { order, bids: order.bids ?? [], status: order.status }
 }
 
 // Aggregator actions
-export const acceptOrder = (orderId: string) =>
-  apiFetch<{ success: boolean }>(`/api/orders/${orderId}/accept`, { method: 'POST' })
+export const submitDirectQuote = (orderId: string, payload: DirectQuoteRequest) =>
+  apiFetch<LifecycleResponse>(`/api/orders/${orderId}/direct-quote`, {
+    method: 'POST', body: JSON.stringify(payload),
+  })
+
+export const acceptOrder = (orderId: string, concurrency?: ExpectedVersion) =>
+  apiFetch<{ success: boolean }>(`/api/orders/${orderId}/accept`, {
+    method: 'POST',
+    ...(concurrency ? { body: JSON.stringify(concurrency) } : {}),
+  })
 
 export const fulfillOrder = (
   orderId: string,
   fulfillmentType: 'delivered' | 'picked_up',
-  deliveryFee?: number
+  deliveryFee?: number,
+  concurrency?: ExpectedVersion
 ) =>
   apiFetch<{ success: boolean }>(`/api/orders/${orderId}/fulfill`, {
     method: 'POST',
-    body: JSON.stringify({ fulfillmentType, deliveryFee }),
+    body: JSON.stringify({ fulfillmentType, deliveryFee, ...concurrency }),
   })
 
 export const getAggregatorDashboard = () =>

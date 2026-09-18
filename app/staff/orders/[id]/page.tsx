@@ -12,6 +12,13 @@ import { getOrder, ApiError } from '@/lib/api'
 import type { Order, Bid, OrderStatus } from '@/lib/types'
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
+  direct_quote_requested: 'Price Required',
+  direct_price_review: 'Direct Price Review',
+  direct_reassignment: 'Awaiting Reassignment',
+  clearline_price_review: 'Price Review',
+  cancelled: 'Cancelled',
+  post_fulfilment_recalled: 'Recalled After Fulfilment',
+  fulfilled: 'Fulfilled',
   pending_review: 'Pending Review',
   rejected: 'Rejected',
   bidding: 'Bidding Active',

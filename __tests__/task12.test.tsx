@@ -46,21 +46,21 @@ vi.mock('@/components/shared/MedicationTag', () => ({
 import { OrderCard } from '@/components/aggregator/OrderCard'
 import AggregatorDashboardPage from '@/app/aggregator/dashboard/page'
 import { ApiError } from '@/lib/api'
-import type { Order, AggregatorDashboard } from '@/lib/types'
+import type { Order, Medication, AggregatorDashboard } from '@/lib/types'
 
 // -------------------------
 // Test fixtures
 // -------------------------
 
-function makeMed(name: string) {
-  return { name, dosage: '500mg', quantity: 1 }
+function makeMed(name: string): Medication {
+  return { name, dosage: '500mg', quantity: 1, tablets: 1, frequency: '', durationDays: 1, diagnosis: 'Hypertension' }
 }
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: 'order-1',
     intakeId: 'INT-001',
-    enrollee: { fullName: 'Jane Doe', email: 'jane@example.com', phone: '080000', address: '1 St' },
+    enrollee: { fullName: 'Jane Doe', enrolleeId: 'EN-1', phone: '080000', address: '1 St' },
     diagnosis: 'Hypertension',
     medications: [makeMed('Amlodipine'), makeMed('Lisinopril')],
     status: 'bidding',
@@ -77,7 +77,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
 
 describe('OrderCard', () => {
   it('renders order.intakeId and order.diagnosis', () => {
-    const order = makeOrder({ intakeId: 'INT-999', diagnosis: 'Diabetes Type 2' })
+    const order = makeOrder({ intakeId: 'INT-999', medications: [{ ...makeMed('Drug'), diagnosis: 'Diabetes Type 2' }] })
     render(<OrderCard order={order} />)
     expect(screen.getByText('INT-999')).toBeInTheDocument()
     expect(screen.getByText('Diabetes Type 2')).toBeInTheDocument()
@@ -175,7 +175,7 @@ describe('AggregatorDashboardPage', () => {
     })
   })
 
-  it('shows "Your Active Orders" section and "Verify Collection" link when wonOrders has items', async () => {
+  it('shows "Your Active Orders" section and "View Order" link when wonOrders has items', async () => {
     const won = makeOrder({ id: 'won-1', intakeId: 'INT-WON' })
     mockGetAggregatorDashboard.mockResolvedValue({
       openSessions: [],
@@ -185,7 +185,7 @@ describe('AggregatorDashboardPage', () => {
     render(<AggregatorDashboardPage />)
     await waitFor(() => {
       expect(screen.getByText('Your Active Orders')).toBeInTheDocument()
-      const link = screen.getByRole('link', { name: /verify collection/i })
+      const link = screen.getByRole('link', { name: /view order/i })
       expect(link).toHaveAttribute('href', '/aggregator/orders/won-1')
     })
   })
@@ -202,13 +202,13 @@ describe('AggregatorDashboardPage', () => {
     })
   })
 
-  it('renders completed orders table with intakeId, date, total, approval code', async () => {
+  it('renders completed orders table with intakeId, date, total, status', async () => {
     const completed = makeOrder({
       id: 'comp-1',
       intakeId: 'INT-COMP',
       createdAt: '2025-01-15T10:00:00.000Z',
       winnerTotalPrice: 12500,
-      approvalCode: 'APR-999',
+      status: 'completed',
     })
     mockGetAggregatorDashboard.mockResolvedValue({
       openSessions: [],
@@ -218,17 +218,16 @@ describe('AggregatorDashboardPage', () => {
     render(<AggregatorDashboardPage />)
     await waitFor(() => {
       expect(screen.getByText('INT-COMP')).toBeInTheDocument()
-      expect(screen.getByText('APR-999')).toBeInTheDocument()
+      expect(screen.getByText('Completed')).toBeInTheDocument()
       expect(screen.getByText(/12,500/)).toBeInTheDocument()
     })
   })
 
-  it('shows "—" for missing approvalCode', async () => {
+  it('shows "—" for missing total', async () => {
     const completed = makeOrder({
       id: 'comp-2',
       intakeId: 'INT-NO-APR',
-      winnerTotalPrice: 5000,
-      approvalCode: undefined,
+      winnerTotalPrice: undefined,
     })
     mockGetAggregatorDashboard.mockResolvedValue({
       openSessions: [],
@@ -238,7 +237,7 @@ describe('AggregatorDashboardPage', () => {
     render(<AggregatorDashboardPage />)
     await waitFor(() => {
       // Should render a dash for missing approval code (the span with text "—")
-      const dashes = screen.getAllByText('—')
+      const dashes = screen.getAllByText(/—/)
       expect(dashes.length).toBeGreaterThanOrEqual(1)
     })
   })
