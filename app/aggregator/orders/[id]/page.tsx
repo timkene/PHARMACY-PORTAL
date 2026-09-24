@@ -11,6 +11,7 @@ import { getOrder, acceptOrder, fulfillOrder, submitDirectQuote, ApiError } from
 import { AssignmentStatus } from '@/components/aggregator/AssignmentStatus'
 import type { FormEvent } from 'react'
 import { isDirectApproved, type Order, type Bid } from '@/lib/types'
+import { medicationSubtotal, parseMoney, procedurePrices } from '@/lib/procedure-pricing'
 
 export default function AggregatorOrderPage() {
   const { id } = useParams<{ id: string }>()
@@ -28,6 +29,7 @@ function AggregatorOrderDetail({ id }: { id: string }) {
   const [fulfillMode, setFulfillMode] = useState<'delivered' | 'picked_up' | null>(null)
   const [deliveryFee, setDeliveryFee] = useState('')
 
+  const [linePrices, setLinePrices] = useState<Record<string, string>>({})
   const [totalPrice, setTotalPrice] = useState('')
   const [unavailable, setUnavailable] = useState(false)
   const [fresh, setFresh] = useState(false)
@@ -40,6 +42,7 @@ function AggregatorOrderDetail({ id }: { id: string }) {
     request.current++
     setOrder(null)
     setBids([])
+    setLinePrices({})
     setTotalPrice('')
     setDeliveryFee('')
     setFulfillMode(null)
@@ -153,6 +156,7 @@ function AggregatorOrderDetail({ id }: { id: string }) {
       if (!revoked.current) {
         setToast(success)
         setFulfillMode(null)
+        setLinePrices({})
         setTotalPrice('')
         await load()
       }
@@ -173,13 +177,18 @@ function AggregatorOrderDetail({ id }: { id: string }) {
 
   const handleQuote = (event: FormEvent) => {
     event.preventDefault()
-    const price = Number(totalPrice)
-    if (!totalPrice.trim() || !Number.isFinite(price) || price <= 0) {
-      setToast('Enter a total price greater than zero.')
+    const legacy = order.medications.some(med => !med.lineId)
+    if (!legacy && order.medications.some(med => !med.procedureCode)) {
+      setToast('This order is missing a procedure code. Ask Clearline to correct the order.'); return
+    }
+    const lines = legacy ? null : procedurePrices(order.medications, linePrices)
+    const legacyAmount = parseMoney(totalPrice)
+    if (!lines && !(legacy && legacyAmount)) {
+      setToast(legacy ? 'Enter a total price greater than zero.' : 'Enter a positive price for every medication procedure.')
       return
     }
     if (!direct || status !== 'direct_quote_requested') return
-    void mutate(() => submitDirectQuote(id, { totalPrice: price, expectedVersion: order.version ?? 0 }),
+    void mutate(() => submitDirectQuote(id, { ...(lines ? { procedurePrices: lines } : { totalPrice: legacyAmount! }), expectedVersion: order.version ?? 0 }),
       'Price submitted — awaiting Clearline approval')
   }
 
@@ -191,12 +200,12 @@ function AggregatorOrderDetail({ id }: { id: string }) {
 
   const handleFulfill = (type: 'delivered' | 'picked_up') => {
     if (status !== 'accepted') return
-    const fee = type === 'delivered' ? Number(deliveryFee) : undefined
-    if (type === 'delivered' && (!deliveryFee.trim() || !Number.isFinite(fee) || (fee ?? -1) < 0)) {
-      setToast('Please enter a valid delivery fee (zero or more).')
+    const fee = type === 'delivered' ? parseMoney(deliveryFee) : undefined
+    if (type === 'delivered' && fee === null) {
+      setToast('Please enter a positive delivery fee.')
       return
     }
-    void mutate(() => direct ? fulfillOrder(id, type, fee, concurrency) : fulfillOrder(id, type, fee),
+    void mutate(() => direct ? fulfillOrder(id, type, fee ?? undefined, concurrency) : fulfillOrder(id, type, fee ?? undefined),
       type === 'picked_up' ? 'Order closed — marked as picked up. Submitted for payment.'
         : 'Order marked as delivered. Klaire will ask the enrollee to confirm receipt.')
   }
@@ -211,11 +220,17 @@ function AggregatorOrderDetail({ id }: { id: string }) {
         {inactive && <p role="status">This assignment is no longer active.</p>}
         {direct && status === 'direct_quote_requested' && (
           <form onSubmit={handleQuote} className="bg-surface-lowest border border-outline-variant rounded p-5 space-y-4">
-            <label htmlFor="direct-total" className="block font-semibold">Total Price / Cost (₦)</label>
-            <p className="text-body-sm text-on-surface-variant">Enter the total price for this prescription. Clearline will review it before you can accept.</p>
-            <input id="direct-total" type="number" required min="0.01" step="0.01"
-              value={totalPrice} disabled={disabled} onChange={e => setTotalPrice(e.target.value)}
-              className="border border-outline rounded px-3 py-2" />
+            {order.medications.every(med => med.lineId) ? <><p className="font-semibold">Enter each medication line total (₦)</p>
+            {order.medications.map((med, idx) => <label key={med.lineId ?? idx} className="block text-sm">
+              {med.procedureCode || 'Missing procedure code'} — {med.name} · {med.dosage} · Quantity {med.quantity}<br />Total price for {med.quantity} units (₦)
+              <input type="number" required min="0.01" step="0.01"
+                value={linePrices[med.lineId ?? ''] ?? ''} disabled={disabled}
+                onChange={e => setLinePrices(prev => ({ ...prev, [med.lineId ?? '']: e.target.value }))}
+                className="block border border-outline rounded px-3 py-2" />
+            </label>)}
+            <p>Medication subtotal: ₦{medicationSubtotal(procedurePrices(order.medications, linePrices) ?? []).toLocaleString()}</p></>
+            : <><label htmlFor="direct-total" className="block font-semibold">Total Price / Cost (₦)</label><p>Legacy order: individual medication prices are unavailable, so PA generation will remain ineligible.</p>
+              <input id="direct-total" type="number" required min="0.01" step="0.01" value={totalPrice} disabled={disabled} onChange={e => setTotalPrice(e.target.value)} className="border border-outline rounded px-3 py-2" /></>}
             <button type="submit" disabled={disabled} className="block bg-secondary text-on-secondary rounded px-5 py-2.5 font-semibold disabled:opacity-60">
               {actioning ? 'Submitting…' : 'Submit Price'}
             </button>
@@ -225,6 +240,7 @@ function AggregatorOrderDetail({ id }: { id: string }) {
           <div className="bg-surface-container rounded p-5 space-y-2" role="status">
             <p className="font-semibold">Price submitted — awaiting Clearline approval</p>
             <p>Submitted price: ₦{order.directQuote?.totalPrice.toLocaleString() ?? '—'}</p>
+            {order.directQuote?.procedurePrices?.map(line => { const med = order.medications.find(item => item.lineId === line.medicationLineId); return <p key={line.medicationLineId}>{line.procedureCode} — {med?.name} · {med?.dosage} · {med?.quantity} units: line total ₦{line.amount.toLocaleString()}</p> })}
             <p>No further action is required until Clearline responds.</p>
           </div>
         )}
@@ -332,6 +348,7 @@ function AggregatorOrderDetail({ id }: { id: string }) {
             {fulfillMode === 'picked_up' && (
               <div className="space-y-3">
                 <p className="text-body-sm text-on-surface-variant">Confirm the enrollee picked up their medication in person.</p>
+                <p>Medication total: ₦{order.medicationSubtotal?.toLocaleString() ?? '—'} · Overall total: ₦{order.overallTotal?.toLocaleString() ?? '—'}</p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => handleFulfill('picked_up')}
@@ -353,7 +370,7 @@ function AggregatorOrderDetail({ id }: { id: string }) {
                   <label className="block text-body-sm font-semibold text-on-surface mb-1">Delivery Fee (₦)</label>
                   <input
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
                     placeholder="e.g. 1500"
                     value={deliveryFee}
@@ -361,6 +378,8 @@ function AggregatorOrderDetail({ id }: { id: string }) {
                     className="w-48 border border-outline rounded px-3 py-2 text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                   <p className="text-label-sm text-on-surface-variant mt-1">This will be added to the total payment.</p>
+                  <p>Medication total: ₦{order.medicationSubtotal?.toLocaleString() ?? '—'}</p>
+                  <p>Overall total: ₦{((order.medicationSubtotal ?? 0) + (parseMoney(deliveryFee) ?? 0)).toLocaleString()}</p>
                 </div>
                 <div className="flex gap-3">
                   <button
