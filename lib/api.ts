@@ -167,10 +167,10 @@ export const getAggregatorDashboard = () =>
 export const getAggregatorOrders = () =>
   apiFetch<AggregatorOrdersResponse>('/api/aggregator/orders')
 
-export const placeBid = (orderId: string, unitPrice: number, totalPrice: number) =>
+export const placeBid = (orderId: string, procedurePrices: import('./procedure-pricing').ProcedurePrice[] | number) =>
   apiFetch<{ bid: Bid }>(`/api/orders/${orderId}/bids`, {
     method: 'POST',
-    body: JSON.stringify({ unitPrice, totalPrice }),
+    body: JSON.stringify(typeof procedurePrices === 'number' ? { totalPrice: procedurePrices } : { procedurePrices }),
   })
 
 // Search — uses pharmacy backend (has MotherDuck)
