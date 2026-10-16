@@ -10,7 +10,7 @@ vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn(() => { throw new Error('LOGIN_REDIRECT') }) }))
 vi.mock('@/app/staff/dashboard/client', () => ({ StaffDashboardClient: () => null }))
 
-const identity = { userId: 'staff-1', name: 'Backend Staff Name', email: 'staff@example.test' }
+const identity = { userId: 'staff-1', name: 'Backend Staff Name', email: 'staff@example.test', permissions: [] }
 const opaqueToken = 'opaque.staff.signature-not-json'
 const cookieGet = vi.fn()
 function response(status: number, data: unknown = identity) {
@@ -41,7 +41,7 @@ describe('server staff identity', () => {
     await expect(getStaffSession()).resolves.toEqual(identity)
     expect(cookieGet).toHaveBeenCalledExactlyOnceWith('staff_session')
     expect(fetch).toHaveBeenCalledExactlyOnceWith(`${API_BASE}/api/auth/staff/me`, {
-      credentials: 'include', cache: 'no-store', redirect: 'error', headers: { Cookie: `staff_session=${opaqueToken}` },
+      credentials: 'include', cache: 'no-store', redirect: 'error', headers: { 'Content-Type': 'application/json', cookie: `staff_session=${opaqueToken}` },
     })
     expect(buffer.mock.calls.some(([value]) => value === opaqueToken)).toBe(false)
     expect(parse.mock.calls.some(([value]) => value === opaqueToken)).toBe(false)
@@ -60,7 +60,7 @@ describe('server staff identity', () => {
     response(401)
     await expect(getStaffSession()).resolves.toBeNull()
     expect(fetch).toHaveBeenCalledWith(`${API_BASE}/api/auth/staff/me`, expect.objectContaining({
-      headers: { Cookie: 'staff_session=invalid%3B%20aggregator_session%3Dinjected' },
+      headers: { 'Content-Type': 'application/json', cookie: 'staff_session=invalid%3B%20aggregator_session%3Dinjected' },
     }))
   })
 
@@ -75,7 +75,7 @@ describe('server staff identity', () => {
     cookieGet.mockReturnValue({ value: token })
     response(401)
     await expect(StaffDashboardPage()).rejects.toThrow('LOGIN_REDIRECT')
-    expect(fetch).toHaveBeenCalledWith(`${API_BASE}/api/auth/staff/me`, expect.objectContaining({ headers: { Cookie: `staff_session=${token}` } }))
+    expect(fetch).toHaveBeenCalledWith(`${API_BASE}/api/auth/staff/me`, expect.objectContaining({ headers: { 'Content-Type': 'application/json', cookie: `staff_session=${token}` } }))
     expect(redirect).toHaveBeenCalledExactlyOnceWith('/staff/login')
   })
 

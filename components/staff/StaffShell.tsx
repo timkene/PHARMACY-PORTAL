@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { logout } from '@/lib/api'
+import { paNavigation, type PaPermission } from '@/lib/pa-permissions'
 
 const NAV_ITEMS = [
   { href: '/staff/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -11,9 +12,10 @@ const NAV_ITEMS = [
 interface StaffShellProps {
   children: React.ReactNode
   userName: string
+  permissions?: readonly PaPermission[]
 }
 
-export function StaffShell({ children, userName }: StaffShellProps) {
+export function StaffShell({ children, userName, permissions = [] }: StaffShellProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -45,6 +47,12 @@ export function StaffShell({ children, userName }: StaffShellProps) {
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
               {item.label}
             </Link>
+          ))}
+          {paNavigation(permissions).map(item => (
+            <span key={item.key} aria-disabled="true" className="block px-6 py-3 text-on-primary/60 text-body-lg"
+              title="Available in a later frontend phase">
+              {item.label} <span className="text-body-sm">(coming soon)</span>
+            </span>
           ))}
         </nav>
 

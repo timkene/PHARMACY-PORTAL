@@ -6,6 +6,7 @@ import { StatusChip } from '@/components/shared/StatusChip'
 import { Toast } from '@/components/shared/Toast'
 import { getOrders, deleteOrder, ApiError } from '@/lib/api'
 import type { Order, OrderStatus } from '@/lib/types'
+import type { PaPermission } from '@/lib/pa-permissions'
 
 const PAGE_SIZE = 20
 
@@ -52,9 +53,10 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 
 interface StaffDashboardClientProps {
   userName: string
+  permissions?: readonly PaPermission[]
 }
 
-export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
+export function StaffDashboardClient({ userName, permissions = [] }: StaffDashboardClientProps) {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
@@ -106,7 +108,7 @@ export function StaffDashboardClient({ userName }: StaffDashboardClientProps) {
   const paged = orders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
-    <StaffShell userName={userName}>
+    <StaffShell userName={userName} permissions={permissions}>
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
       <div className="p-8">

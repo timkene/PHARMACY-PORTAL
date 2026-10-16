@@ -1,3 +1,6 @@
+import { parsePaPermissions } from './pa-permissions'
+import { structuredPaError } from './pa-errors'
+import type { PaErrorCode } from './pa-errors'
 import type {
   DirectQuoteRequest,
   ExpectedVersion,
@@ -29,20 +32,24 @@ function clearDomainCookie(name: string) {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public code?: PaErrorCode, public owningBatchId?: string | null) {
     super(message)
     this.name = 'ApiError'
   }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    ...init,
+/** Shared JSON/raw transport, including auth failures. Never retries a request. */
+export async function apiResponse(path: string, init?: RequestInit): Promise<Response> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  new Headers(init?.headers).forEach((value, key) => {
+    for (const existing of Object.keys(headers)) {
+      if (existing.toLowerCase() === key) delete headers[existing]
+    }
+    headers[key] = value
   })
-  const data = await res.json().catch(() => ({}))
+  const res = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers })
   if (!res.ok) {
+    const data: unknown = await res.json().catch(() => ({}))
     if (res.status === 401 && typeof window !== 'undefined' &&
         window.location.pathname.startsWith('/staff/') &&
         window.location.pathname !== '/staff/login' &&
@@ -56,12 +63,19 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       clearDomainCookie('aggregator_session')
       window.location.assign('/aggregator/login')
     }
-    const error = data as { message?: unknown; detail?: unknown }
+    const structured = structuredPaError(data)
+    const error = (data && typeof data === 'object' ? data : {}) as { message?: unknown; detail?: unknown }
     const message = typeof error.message === 'string' ? error.message
       : typeof error.detail === 'string' ? error.detail : 'Please check your request and try again.'
-    throw new ApiError(res.status, res.status >= 500 ? 'Service unavailable. Please try again.' : message)
+    throw new ApiError(res.status, res.status >= 500 ? 'Service unavailable. Please try again.' : message,
+      res.status < 500 ? structured?.code : undefined, res.status < 500 ? structured?.owningBatchId : undefined)
   }
-  return data as T
+  return res
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await apiResponse(path, init)
+  return await res.json().catch(() => ({})) as T
 }
 
 // Auth
@@ -73,7 +87,7 @@ export const getStaffIdentity = async (headers?: HeadersInit): Promise<StaffIden
   if (!data || typeof data.userId !== 'string' || typeof data.name !== 'string' || typeof data.email !== 'string') {
     throw new Error('Invalid staff identity response')
   }
-  return { userId: data.userId, name: data.name, email: data.email }
+  return { userId: data.userId, name: data.name, email: data.email, permissions: parsePaPermissions(data.permissions) }
 }
 
 export const staffLogin = async (email: string, password: string) => {

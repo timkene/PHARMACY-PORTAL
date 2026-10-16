@@ -1,3 +1,5 @@
+import type { PaPermission } from './pa-permissions'
+
 export interface Enrollee {
   enrolleeId: string
   fullName: string
@@ -107,6 +109,7 @@ export interface StaffIdentity {
   userId: string
   name: string
   email: string
+  permissions?: PaPermission[]
 }
 
 export interface StaffUser {
