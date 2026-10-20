@@ -116,11 +116,20 @@ this frontend work does not publish or deploy them.
   a batch and use its returned version and minimized mutation results inline;
   they cannot browse arbitrary batch pages or issue batch GETs.
 - Creation sends `businessDate`; prepare, recalculate and close send only the
-  latest authoritative batch `expectedVersion`. Conflicts and uncertain
-  mutations pause controls; no state-changing request is retried automatically.
-  A READ user must explicitly reload current data. WRITE-only users need a
-  reader to reconcile uncertain outcomes. Closing requires confirmation and
-  releases ownership without altering historical preparation.
+  latest authoritative batch `expectedVersion`. No state-changing request is
+  retried automatically.
+- Uncertain mutation outcomes (network failures, 5xx responses) and batch or
+  version conflicts pause controls until current data is reloaded. A READ user
+  must explicitly reload; WRITE-only users need a reader to reconcile uncertain
+  outcomes. Batch creation stays locked only when its outcome is uncertain; a
+  definite 4xx rejection is shown and may be retried explicitly.
+- Two known cases do not pause controls because the batch is unchanged:
+  `ORDER_ALREADY_IN_ACTIVE_BATCH` (the backend rejects it before any write, so
+  the error is shown and other orders can still be prepared), and a rejected
+  line filter (400/422) when the batch itself was reloaded successfully (a
+  filter-specific message is shown instead). Filter IDs are limited to 100
+  characters. Closing requires confirmation and releases ownership without
+  altering historical preparation.
 - Pagination uses opaque backend cursors, including empty filtered pages with
   a next cursor. Filters use preparation/mapping status, IssuePa provider ID,
   aggregator ID and stale revision state. Counts labelled `LAST_CALCULATION`
