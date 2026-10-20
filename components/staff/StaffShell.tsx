@@ -49,7 +49,7 @@ export function StaffShell({ children, userName, permissions = [] }: StaffShellP
             </Link>
           ))}
           {paNavigation(permissions).map(item => (
-            <span key={item.key} aria-disabled="true" className="block px-6 py-3 text-on-primary/60 text-body-lg"
+            item.key === 'preparation' ? <Link key={item.key} href="/staff/pa-preparation" aria-current={pathname.startsWith('/staff/pa-preparation') ? 'page' : undefined} className="block px-6 py-3 text-on-primary text-body-lg">{item.label}</Link> : <span key={item.key} aria-disabled="true" className="block px-6 py-3 text-on-primary/60 text-body-lg"
               title="Available in a later frontend phase">
               {item.label} <span className="text-body-sm">(coming soon)</span>
             </span>

@@ -38,12 +38,12 @@ it('preserves existing navigation for staff without PA permissions and performs 
   expect(fetch).not.toHaveBeenCalled()
 })
 
-it('shows only permitted upcoming entries, with no broken links or screen implementation', () => {
+it('enables preparation only and keeps other permitted entries coming soon', () => {
   render(<StaffShell userName="Staff" permissions={['PA_PREPARATION_READ', 'PA_CATALOG_READ']}>Existing screen</StaffShell>)
-  expect(screen.getByText(/PA Preparation/)).toHaveAttribute('aria-disabled', 'true')
+  expect(screen.getByRole('link', { name: 'PA Preparation' })).toHaveAttribute('href', '/staff/pa-preparation')
   expect(screen.getByText(/Procedure Catalog/)).toHaveAttribute('aria-disabled', 'true')
   expect(screen.queryByText(/Mapping Proposals/)).not.toBeInTheDocument()
-  expect(screen.getAllByRole('link')).toHaveLength(2)
+  expect(screen.getAllByRole('link')).toHaveLength(3)
 })
 
 describe('fail-closed presentation', () => {

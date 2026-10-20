@@ -102,3 +102,33 @@ git diff --check
 Vitest's existing setup rejects unmocked fetch requests. Browser/deployment
 integration with cross-site cookies remains a later isolated validation step;
 these unit tests do not establish deployed origin/cookie compatibility.
+
+
+### PA preparation workspace (Phase 4B.2, local implementation)
+
+`/staff/pa-preparation` and `/staff/pa-preparation/[batchId]` use the reviewed
+backend preparation contracts. The backend changes must be released separately;
+this frontend work does not publish or deploy them.
+
+- Staff sessions are validated server-side. Standalone batch/line reads and
+  navigation require `PA_PREPARATION_READ`; mutations require
+  `PA_PREPARATION_WRITE`. WRITE does not imply READ. WRITE-only staff can create
+  a batch and use its returned version and minimized mutation results inline;
+  they cannot browse arbitrary batch pages or issue batch GETs.
+- Creation sends `businessDate`; prepare, recalculate and close send only the
+  latest authoritative batch `expectedVersion`. Conflicts and uncertain
+  mutations pause controls; no state-changing request is retried automatically.
+  A READ user must explicitly reload current data. WRITE-only users need a
+  reader to reconcile uncertain outcomes. Closing requires confirmation and
+  releases ownership without altering historical preparation.
+- Pagination uses opaque backend cursors, including empty filtered pages with
+  a next cursor. Filters use preparation/mapping status, IssuePa provider ID,
+  aggregator ID and stale revision state. Counts labelled `LAST_CALCULATION`
+  are historical totals; null counts remain unavailable.
+- Approved amounts are displayed as existing NGN line totals, never multiplied
+  by quantity. Referring provider, aggregator and IssuePa provider stay distinct.
+  Member validation unavailable remains BLOCKED. READY means prepared data,
+  never PA authorization or submission. Transmission is read-only.
+- Other PA administration navigation remains coming soon. No order-processing,
+  payment, approval, export/import, submission or recovery UI changed. No
+  browser persistence or logging of preparation payloads is introduced.
