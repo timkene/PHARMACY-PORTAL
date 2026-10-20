@@ -46,6 +46,13 @@ it('enables preparation only and keeps other permitted entries coming soon', () 
   expect(screen.getAllByRole('link')).toHaveLength(3)
 })
 
+it.each([['PA_MAPPING_EXPORT'], ['PA_MAPPING_IMPORT']] as const)('links mapping review files for %s only', permission => {
+  render(<StaffShell userName="Staff" permissions={[permission, 'PA_MAPPING_REVIEW']}>Existing screen</StaffShell>)
+  expect(screen.getByRole('link', { name: 'Mapping Review Files' })).toHaveAttribute('href', '/staff/pa-mapping-review')
+  expect(screen.getByText(/Mapping Proposals/)).toHaveAttribute('aria-disabled', 'true')
+  expect(screen.queryByRole('link', { name: 'PA Preparation' })).not.toBeInTheDocument()
+})
+
 describe('fail-closed presentation', () => {
   it('never treats proposal list metadata or recorded ACTIVE as verified', () => {
     const result = proposalPresentation({ ...active, evidenceScope: 'METADATA_ONLY', workflowStatus: 'UNVERIFIED', workflowVerification: 'NOT_EVALUATED' })

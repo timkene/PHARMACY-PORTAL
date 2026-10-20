@@ -141,3 +141,30 @@ this frontend work does not publish or deploy them.
 - Other PA administration navigation remains coming soon. No order-processing,
   payment, approval, export/import, submission or recovery UI changed. No
   browser persistence or logging of preparation payloads is introduced.
+
+
+### Mapping review files (Phase 4B.3, local implementation)
+
+`/staff/pa-mapping-review` uses the reviewed mapping-review export/import
+contracts. Navigation shows it for `PA_MAPPING_EXPORT` or `PA_MAPPING_IMPORT`.
+
+- Export and import are separate permissions; neither grants preparation READ.
+  With `PA_PREPARATION_READ`, open batches can be picked with their listed
+  version; otherwise the batch ID and current version are entered explicitly
+  and the backend version check stays authoritative.
+- Export requests send `expectedVersion`, an optional `after` cursor and a
+  1–100 row limit. Results show exported and skipped rows with backend skip
+  reason codes, expiry and the export ID. An empty scan offers its next cursor
+  without submitting again. Downloads use the authenticated raw CSV response.
+- Uploads accept a file of at most 512 KiB that is valid UTF-8 and send its
+  original bytes unchanged (BOM, line endings and quoting preserved). Only
+  `proposed_medicloud_code`, `proposed_medicloud_description` and
+  `mapping_notes` may be edited. Receipts state that imported rows are
+  PROPOSED only; approval and activation are separate workflows.
+- Definite 4xx rejections are explained and may be retried explicitly. Network
+  failures, 5xx, 408 and `TRANSACTION_CONFLICT_REFRESH_REQUIRED` are uncertain:
+  export creation stays locked until acknowledged, and upload stays locked
+  until an import-status check reports the outcome. Nothing is retried
+  automatically and double submissions are blocked.
+- Export expiry is shown when known; a device-clock warning never replaces the
+  server's `EXPORT_EXPIRED` decision.

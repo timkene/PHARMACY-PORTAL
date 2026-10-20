@@ -9,6 +9,12 @@ const NAV_ITEMS = [
   { href: '/staff/intake/new', label: 'New Intake', icon: 'add_circle' },
 ]
 
+// PA screens that exist; other permitted PA entries remain "coming soon".
+const PA_LINKS = {
+  preparation: '/staff/pa-preparation',
+  'mapping-transfer': '/staff/pa-mapping-review',
+} as const
+
 interface StaffShellProps {
   children: React.ReactNode
   userName: string
@@ -49,7 +55,7 @@ export function StaffShell({ children, userName, permissions = [] }: StaffShellP
             </Link>
           ))}
           {paNavigation(permissions).map(item => (
-            item.key === 'preparation' ? <Link key={item.key} href="/staff/pa-preparation" aria-current={pathname.startsWith('/staff/pa-preparation') ? 'page' : undefined} className="block px-6 py-3 text-on-primary text-body-lg">{item.label}</Link> : <span key={item.key} aria-disabled="true" className="block px-6 py-3 text-on-primary/60 text-body-lg"
+            item.key in PA_LINKS ? <Link key={item.key} href={PA_LINKS[item.key as keyof typeof PA_LINKS]} aria-current={pathname.startsWith(PA_LINKS[item.key as keyof typeof PA_LINKS]) ? 'page' : undefined} className="block px-6 py-3 text-on-primary text-body-lg">{item.label}</Link> : <span key={item.key} aria-disabled="true" className="block px-6 py-3 text-on-primary/60 text-body-lg"
               title="Available in a later frontend phase">
               {item.label} <span className="text-body-sm">(coming soon)</span>
             </span>
