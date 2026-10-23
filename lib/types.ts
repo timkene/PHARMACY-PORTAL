@@ -21,6 +21,7 @@ export type MedicationFrequency =
   | 'every month'
 
 export interface Medication {
+  lineId?: string
   procedureCode?: string
   name: string
   dosage: string
@@ -38,6 +39,7 @@ export interface Bid {
   aggregatorName: string
   unitPrice: number
   totalPrice: number
+  procedurePrices?: import('./procedure-pricing').ProcedurePrice[] | null
   isCheapest: boolean
   submittedAt: string
 }
@@ -61,7 +63,10 @@ export type OrderStatus =
 
 export interface ExpectedVersion { expectedVersion: number }
 
-export interface DirectQuoteRequest extends ExpectedVersion { totalPrice: number }
+export interface DirectQuoteRequest extends ExpectedVersion {
+  procedurePrices?: import('./procedure-pricing').ProcedurePrice[]
+  totalPrice?: number // Legacy orders without medication line IDs only.
+}
 
 export interface LifecycleResponse {
   success: boolean
@@ -72,6 +77,7 @@ export interface LifecycleResponse {
 
 export interface DirectQuote {
   totalPrice: number
+  procedurePrices?: import('./procedure-pricing').ProcedurePrice[] | null
   submittedAt: string
   aggregatorId: string
   assignmentVersion: number
@@ -98,6 +104,11 @@ export interface Order {
   cancelledAt?: string | null
   recalledAt?: string | null
   winnerTotalPrice?: number | null
+  quotedProcedurePrices?: import('./procedure-pricing').ProcedurePrice[] | null
+  approvedProcedurePrices?: import('./procedure-pricing').ProcedurePrice[] | null
+  finalProcedurePrices?: import('./procedure-pricing').ProcedurePrice[] | null
+  medicationSubtotal?: number | null
+  overallTotal?: number | null
   fulfillmentType?: 'delivered' | 'picked_up'
   deliveryFee?: number
   biddingEndsAt?: string

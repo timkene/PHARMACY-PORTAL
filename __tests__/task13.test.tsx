@@ -106,16 +106,16 @@ describe('aggregator direct assignment', () => {
     expect(acceptOrder).toHaveBeenCalledTimes(1)
   })
 
-  it('supports legacy accepted direct orders with version zero and zero delivery fee; blocks duplicate fulfilment', async () => {
+  it('supports legacy accepted direct orders with version zero and a positive delivery fee; blocks duplicate fulfilment', async () => {
     await show(order({ status: 'accepted', version: undefined }))
     fireEvent.click(screen.getByRole('button', { name: /Delivered/ }))
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } })
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '50' } })
     vi.mocked(fulfillOrder).mockReturnValue(new Promise(() => {}))
     const button = screen.getByRole('button', { name: 'Confirm Delivered' })
     fireEvent.click(button)
     fireEvent.click(button)
     expect(button).toBeDisabled()
-    expect(fulfillOrder).toHaveBeenCalledExactlyOnceWith('order-1', 'delivered', 0, { expectedVersion: 0 })
+    expect(fulfillOrder).toHaveBeenCalledExactlyOnceWith('order-1', 'delivered', 50, { expectedVersion: 0 })
   })
 
   it('does not accept legacy direct orders without explicit approval', async () => {
@@ -194,7 +194,7 @@ describe('competitive compatibility', () => {
     fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '250' } })
     fireEvent.click(screen.getByRole('button', { name: 'Submit Bid' }))
     await screen.findByText('Bid Submitted')
-    expect(placeBid).toHaveBeenCalledExactlyOnceWith('order-1', 0, 500)
+    expect(placeBid).toHaveBeenCalledExactlyOnceWith('order-1', 500)
     expect(submitDirectQuote).not.toHaveBeenCalled()
   })
 
