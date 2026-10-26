@@ -79,6 +79,12 @@ export const listCatalogSnapshots = (params: { limit?: number; cursor?: string }
   catalogs + query({ limit: params.limit, cursor: params.cursor }), { cache: 'no-store' })
 export const getCatalogSnapshot = (snapshotId: string) => apiFetch<CatalogMetadata>(`${catalogs}/${id(snapshotId)}`, { cache: 'no-store' })
 /** Upload an already signed artifact; clients never construct trust or signing authority. */
+export async function readSignedCatalog(file: Blob): Promise<Uint8Array> {
+  if (!file.size || file.size > MAX_CATALOG_BYTES) throw new Error('Upload size invalid')
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  checkedBytes(bytes, MAX_CATALOG_BYTES)
+  return bytes
+}
 export const ingestSignedCatalog = (bytes: Uint8Array) => apiFetch<CatalogMutationResult>(catalogs, {
   method: 'POST', headers: { ...csrf, 'Content-Type': 'application/json' }, body: checkedBytes(bytes, MAX_CATALOG_BYTES), cache: 'no-store',
 })

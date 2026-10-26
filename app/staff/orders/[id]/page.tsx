@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { StaffShell } from '@/components/staff/StaffShell'
 import { BiddingTable } from '@/components/staff/BiddingTable'
@@ -221,11 +222,16 @@ export default function StaffOrderPage() {
 
         {/* STATE 5: Completed */}
         {status === 'completed' && (
-          <div className="bg-secondary/10 border border-secondary/30 rounded p-5">
+          <div className="bg-secondary/10 border border-secondary/30 rounded p-5 space-y-2">
             <p className="text-secondary font-bold text-title-md mb-1">Order Completed</p>
             <p className="text-body-sm text-on-surface-variant">
               The enrollee confirmed they received their medication.
             </p>
+            {/^[a-f\d]{24}$/i.test(id) && (
+              <Link className="text-body-sm underline" href={`/staff/pa-generation/${encodeURIComponent(id)}`}>
+                Open PA generation and recovery
+              </Link>
+            )}
           </div>
         )}
 

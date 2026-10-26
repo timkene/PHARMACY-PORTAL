@@ -44,11 +44,13 @@ Contracts target pharmacy-portal-api commit
 assumed deployed. No production requests are part of implementation/tests.
 
 `lib/pa-types.ts` models the 21 reviewed preparation, CSV transfer, proposal and
-catalog routes. `lib/pa-api.ts` exposes only those operations: no IssuePa,
-generate-pa, reconciliation or retry API. Request bodies select only the actual
-contract fields; actor, permission, price and catalog-authority extras are not
-forwarded. Catalog ingestion uploads an already signed, untrusted UTF-8 artifact;
-there is no client signing, key storage, extraction or trust inference.
+catalog routes plus the public order PA generation/recovery shapes. `lib/pa-api.ts`
+exposes only the 21 administration operations. `lib/pa-generation.ts` calls the
+existing order contracts `POST /api/orders/{id}/generate-pa`, interruption recovery
+and per-line verify. Request bodies select only the actual contract fields; actor,
+permission, price and catalog-authority extras are not forwarded. Catalog ingestion
+uploads an already signed, untrusted UTF-8 artifact; there is no client signing,
+key storage, extraction or trust inference.
 
 `lib/pa-permissions.ts` retains only the eleven allowlisted PA permissions from
 GET /api/auth/staff/me. Missing permissions on older backends default to none.
@@ -56,8 +58,9 @@ Cookies remain opaque and login/logout behavior stays unchanged. UI permission
 checks never replace backend authorization or the three-person workflow rules.
 The dashboard passes this server-validated permission list to StaffShell. Other
 legacy staff pages that do not supply permissions keep the existing navigation.
-Permitted PA entries are visibly disabled/coming soon: full screens and links to
-them are deliberately deferred. No broken route or new public page is added.
+Staff navigation links PA screens only when the matching allowlisted permission
+is present. PA generation is available to authenticated staff because the order
+contract authorizes the staff session, while recovery remains server-allowlisted.
 
 The shared apiResponse/apiFetch transport merges all HeadersInit forms, keeps
 credentials include, and handles raw and JSON responses through the same 401
@@ -168,3 +171,20 @@ contracts. Navigation shows it for `PA_MAPPING_EXPORT` or `PA_MAPPING_IMPORT`.
   automatically and double submissions are blocked.
 - Export expiry is shown when known; a device-clock warning never replaces the
   server's `EXPORT_EXPIRED` decision.
+
+### Mapping proposals, catalog admin and PA generation (Workstream C)
+
+`/staff/pa-mapping-proposals`, `/staff/pa-catalog` and `/staff/pa-generation`
+use the reviewed backend contracts. Existing `/staff/pa-preparation` and
+`/staff/pa-mapping-review` screens are unchanged.
+
+- Proposal lists are metadata-only. Approve, reject and activate require a
+  verified detail GET, the matching independent permission, expected versions,
+  a review reason and confirmation. The importer cannot approve or activate.
+  The listing contract returns PROPOSED rows; other states are opened by ID.
+- Catalog ingest uploads original signed JSON bytes. Validate and trust send
+  `{}` only, on independent staff identities. Mutation receipts are not treated
+  as verified GET metadata.
+- PA generation sends `{ expectedVersion }` from the loaded order. Interrupted
+  and uncertain lines stay locked until explicit recovery. Verification never
+  calls IssuePa. Network/5xx results are uncertain and are not retried.

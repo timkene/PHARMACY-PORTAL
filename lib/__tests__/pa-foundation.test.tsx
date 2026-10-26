@@ -34,22 +34,23 @@ it('preserves existing navigation for staff without PA permissions and performs 
   render(<StaffShell userName="Staff">Existing screen</StaffShell>)
   expect(screen.getByRole('link', { name: /dashboard/i })).toHaveAttribute('href', '/staff/dashboard')
   expect(screen.getByRole('link', { name: /new intake/i })).toHaveAttribute('href', '/staff/intake/new')
+  expect(screen.getByRole('link', { name: /PA Generation/ })).toHaveAttribute('href', '/staff/pa-generation')
   expect(screen.queryByText(/PA Preparation/)).not.toBeInTheDocument()
   expect(fetch).not.toHaveBeenCalled()
 })
 
-it('enables preparation only and keeps other permitted entries coming soon', () => {
+it('enables preparation and catalog screens from server-validated permissions', () => {
   render(<StaffShell userName="Staff" permissions={['PA_PREPARATION_READ', 'PA_CATALOG_READ']}>Existing screen</StaffShell>)
   expect(screen.getByRole('link', { name: 'PA Preparation' })).toHaveAttribute('href', '/staff/pa-preparation')
-  expect(screen.getByText(/Procedure Catalog/)).toHaveAttribute('aria-disabled', 'true')
+  expect(screen.getByRole('link', { name: 'Procedure Catalog' })).toHaveAttribute('href', '/staff/pa-catalog')
   expect(screen.queryByText(/Mapping Proposals/)).not.toBeInTheDocument()
-  expect(screen.getAllByRole('link')).toHaveLength(3)
+  expect(screen.getAllByRole('link')).toHaveLength(5)
 })
 
 it.each([['PA_MAPPING_EXPORT'], ['PA_MAPPING_IMPORT']] as const)('links mapping review files for %s only', permission => {
   render(<StaffShell userName="Staff" permissions={[permission, 'PA_MAPPING_REVIEW']}>Existing screen</StaffShell>)
   expect(screen.getByRole('link', { name: 'Mapping Review Files' })).toHaveAttribute('href', '/staff/pa-mapping-review')
-  expect(screen.getByText(/Mapping Proposals/)).toHaveAttribute('aria-disabled', 'true')
+  expect(screen.getByRole('link', { name: 'Mapping Proposals' })).toHaveAttribute('href', '/staff/pa-mapping-proposals')
   expect(screen.queryByRole('link', { name: 'PA Preparation' })).not.toBeInTheDocument()
 })
 

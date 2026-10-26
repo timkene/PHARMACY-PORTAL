@@ -81,6 +81,14 @@ it.each([new Uint8Array(), new Uint8Array(pa.MAX_CSV_BYTES + 1), new Uint8Array(
   expect(fetch).not.toHaveBeenCalled()
 })
 
+it('reads signed catalog JSON bytes unchanged and rejects oversize artifacts before network', async () => {
+  const catalog = new TextEncoder().encode('{"signed":"fixture"}')
+  const file = { size: catalog.length, arrayBuffer: async () => catalog.buffer } as Blob
+  expect(Array.from(await pa.readSignedCatalog(file))).toEqual(Array.from(catalog))
+  expect(() => pa.ingestSignedCatalog(new Uint8Array(pa.MAX_CATALOG_BYTES + 1))).toThrow()
+  expect(fetch).not.toHaveBeenCalled()
+})
+
 it('accepts the exact 512 KiB boundary and reads files without changing bytes', async () => {
   await pa.importMappingProposals(uuid, new Uint8Array(pa.MAX_CSV_BYTES).fill(65))
   expect((called().init.body as ArrayBuffer).byteLength).toBe(pa.MAX_CSV_BYTES)
