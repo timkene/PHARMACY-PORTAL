@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/staff/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { href: '/staff/intake/new', label: 'New Intake', icon: 'add_circle' },
   { href: '/staff/pa-generation', label: 'PA Generation', icon: 'prescriptions' },
+  { href: '/staff/request-export', label: 'PA Export', icon: 'download' },
 ]
 
 const PA_LINKS = {

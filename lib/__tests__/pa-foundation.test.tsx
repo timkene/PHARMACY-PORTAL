@@ -35,6 +35,7 @@ it('preserves existing navigation for staff without PA permissions and performs 
   expect(screen.getByRole('link', { name: /dashboard/i })).toHaveAttribute('href', '/staff/dashboard')
   expect(screen.getByRole('link', { name: /new intake/i })).toHaveAttribute('href', '/staff/intake/new')
   expect(screen.getByRole('link', { name: /PA Generation/ })).toHaveAttribute('href', '/staff/pa-generation')
+  expect(screen.getByRole('link', { name: /PA Export/ })).toHaveAttribute('href', '/staff/request-export')
   expect(screen.queryByText(/PA Preparation/)).not.toBeInTheDocument()
   expect(fetch).not.toHaveBeenCalled()
 })
@@ -44,7 +45,7 @@ it('enables preparation and catalog screens from server-validated permissions', 
   expect(screen.getByRole('link', { name: 'PA Preparation' })).toHaveAttribute('href', '/staff/pa-preparation')
   expect(screen.getByRole('link', { name: 'Procedure Catalog' })).toHaveAttribute('href', '/staff/pa-catalog')
   expect(screen.queryByText(/Mapping Proposals/)).not.toBeInTheDocument()
-  expect(screen.getAllByRole('link')).toHaveLength(5)
+  expect(screen.getAllByRole('link')).toHaveLength(6)
 })
 
 it.each([['PA_MAPPING_EXPORT'], ['PA_MAPPING_IMPORT']] as const)('links mapping review files for %s only', permission => {
