@@ -7,12 +7,15 @@ import { paNavigation, type PaPermission } from '@/lib/pa-permissions'
 const NAV_ITEMS = [
   { href: '/staff/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { href: '/staff/intake/new', label: 'New Intake', icon: 'add_circle' },
+  { href: '/staff/pa-generation', label: 'PA Generation', icon: 'prescriptions' },
+  { href: '/staff/request-export', label: 'PA Export', icon: 'download' },
 ]
 
-// PA screens that exist; other permitted PA entries remain "coming soon".
 const PA_LINKS = {
   preparation: '/staff/pa-preparation',
   'mapping-transfer': '/staff/pa-mapping-review',
+  'mapping-proposals': '/staff/pa-mapping-proposals',
+  catalog: '/staff/pa-catalog',
 } as const
 
 interface StaffShellProps {

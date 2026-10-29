@@ -141,8 +141,42 @@ export const createOrder = (payload: {
     body: JSON.stringify(payload),
   })
 
-export const getOrders = () =>
-  apiFetch<{ orders: Order[] }>('/api/orders')
+export const getOrders = (page = 1, limit = 20) =>
+  apiFetch<{ orders: Order[]; total: number; page: number }>(
+    `/api/orders?page=${encodeURIComponent(String(page))}&limit=${encodeURIComponent(String(limit))}`,
+  )
+
+export async function getAllStaffOrders(): Promise<Order[]> {
+  const pageSize = 100
+  const first = await getOrders(1, pageSize)
+  const orders = [...(first.orders ?? [])]
+  const total = typeof first.total === 'number' ? first.total : orders.length
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  for (let page = 2; page <= pages; page += 1) {
+    const next = await getOrders(page, pageSize)
+    orders.push(...(next.orders ?? []))
+  }
+  return orders
+}
+
+export async function loadOrdersForPaExport(): Promise<Order[]> {
+  const listed = await getAllStaffOrders()
+  const detailed = await Promise.all(listed.map(async order => {
+    if (order.provider?.providerId && order.provider?.providerName) return order
+    try {
+      const { order: detail } = await getOrder(order.id)
+      return {
+        ...order,
+        ...detail,
+        medications: (detail.medications?.length ? detail.medications : order.medications) ?? [],
+        provider: detail.provider ?? order.provider,
+      }
+    } catch {
+      return order
+    }
+  }))
+  return detailed
+}
 
 export const deleteOrder = (id: string) =>
   apiFetch<{ success: boolean }>(`/api/orders/${id}`, { method: 'DELETE' })

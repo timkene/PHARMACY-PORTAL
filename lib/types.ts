@@ -1,4 +1,5 @@
 import type { PaPermission } from './pa-permissions'
+import type { PaPublicState } from './pa-types'
 
 export interface Enrollee {
   enrolleeId: string
@@ -114,6 +115,7 @@ export interface Order {
   biddingEndsAt?: string
   createdAt: string
   completedAt?: string
+  paGeneration?: PaPublicState
 }
 
 export interface StaffIdentity {

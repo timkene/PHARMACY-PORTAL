@@ -12,7 +12,10 @@ export async function getStaffSession(): Promise<StaffSession | null> {
 
   try {
     // Forward only this credential; the backend validates its signature and staff role.
-    return await getStaffIdentity({ Cookie: `${STAFF_SESSION_COOKIE}=${encodeURIComponent(token)}` })
+    // Encode cookie delimiters only. encodeURIComponent would turn base64 padding
+    // (`=`) into %3D, which FastAPI does not treat as the signed staff session.
+    const safe = token.replaceAll('\r', '').replaceAll('\n', '').replaceAll(';', '%3B').replaceAll(',', '%2C')
+    return await getStaffIdentity({ Cookie: `${STAFF_SESSION_COOKIE}=${safe}` })
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null
     // Outages and invalid backend responses are errors, not authenticated sessions.

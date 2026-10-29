@@ -97,3 +97,26 @@ export interface CatalogMutationResult {
   providerTariffEligibility: 'NOT_VERIFIED'; priceApplicability: 'NOT_VERIFIED'
 }
 export interface CatalogValidationResult { snapshotId: string; validationEvidenceId: string; status: 'EVIDENCE_VALIDATED' }
+
+/** Public staff PA ledger from GET /api/orders/{id} and generation/recovery POSTs. */
+export interface PaPublicLine {
+  lineId: string; procedureCode?: string | null; description?: string | null
+  quantity?: number | null; amount?: number | null; status: string
+  paNumber: string | null; failureKind?: string | null
+}
+export type PaPublicState =
+  | { available: false; status: string; active?: never; interrupted?: never; lines?: never }
+  | { available: true; status: string; active: boolean; interrupted: boolean; lines: PaPublicLine[] }
+export interface PaGenerationResult { status: string; lines: PaPublicLine[] }
+export interface PaVerifyResult { status: string; line: PaPublicLine }
+export interface VerificationResolution {
+  resolution: 'existing_pa' | 'confirmed_no_pa' | 'confirmed_rejected'
+  evidence: string
+  paNumber?: string | null
+  confirmNoPaCreated?: boolean
+  confirmAuthoritativeAbsence?: boolean
+  reconciliationReference?: string | null
+  verificationMethod?: string | null
+  checkedWith?: string | null
+  verifiedAt?: string | null
+}
