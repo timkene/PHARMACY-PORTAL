@@ -60,7 +60,7 @@ describe('server staff identity', () => {
     response(401)
     await expect(getStaffSession()).resolves.toBeNull()
     expect(fetch).toHaveBeenCalledWith(`${API_BASE}/api/auth/staff/me`, expect.objectContaining({
-      headers: { 'Content-Type': 'application/json', cookie: 'staff_session=invalid%3B%20aggregator_session%3Dinjected' },
+      headers: { 'Content-Type': 'application/json', cookie: 'staff_session=invalid%3B aggregator_session=injected' },
     }))
   })
 
