@@ -159,23 +159,40 @@ export async function getAllStaffOrders(): Promise<Order[]> {
   return orders
 }
 
+export const getAggregators = () =>
+  apiFetch<Array<{ id: string; companyName?: string | null }>>('/api/aggregators')
+
 export async function loadOrdersForPaExport(): Promise<Order[]> {
   const listed = await getAllStaffOrders()
-  const detailed = await Promise.all(listed.map(async order => {
-    if (order.provider?.providerId && order.provider?.providerName) return order
-    try {
-      const { order: detail } = await getOrder(order.id)
-      return {
-        ...order,
-        ...detail,
-        medications: (detail.medications?.length ? detail.medications : order.medications) ?? [],
-        provider: detail.provider ?? order.provider,
+  const listedNames = new Map(listed.map(order => [order.id, order.winnerName]))
+  const [aggregators, detailed] = await Promise.all([
+    getAggregators().catch(() => []),
+    Promise.all(listed.map(async order => {
+      if (order.provider?.providerId && order.provider?.providerName && order.winnerId) return order
+      try {
+        const { order: detail } = await getOrder(order.id)
+        return {
+          ...order,
+          ...detail,
+          medications: (detail.medications?.length ? detail.medications : order.medications) ?? [],
+          provider: detail.provider ?? order.provider,
+          winnerId: detail.winnerId ?? order.winnerId,
+          winnerName: detail.winnerName,
+        }
+      } catch {
+        return order
       }
-    } catch {
-      return order
-    }
+    })),
+  ])
+  const names = new Map(
+    aggregators
+      .filter(row => row.id)
+      .map(row => [row.id, row.companyName ?? ''] as const),
+  )
+  return detailed.map(order => ({
+    ...order,
+    winnerName: order.winnerName || (order.winnerId ? names.get(order.winnerId) : undefined) || listedNames.get(order.id),
   }))
-  return detailed
 }
 
 export const deleteOrder = (id: string) =>

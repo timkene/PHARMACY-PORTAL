@@ -85,7 +85,7 @@ export function PaRequestExportTable({ userName, permissions = [] }: {
       <div className="p-8">
         <h1 className="text-headline-lg font-semibold text-on-surface mb-2">PA Request Export</h1>
         <p className="text-body-lg text-on-surface-variant mb-6">
-          One row per requested procedure. Exports contain only the seven confirmed columns.
+          One row per requested procedure. Exports contain only the eight confirmed columns.
         </p>
         <form className="grid gap-4 md:grid-cols-4 mb-4" onSubmit={event => event.preventDefault()}>
           <label className="text-body-sm text-on-surface">Date from
@@ -132,9 +132,9 @@ export function PaRequestExportTable({ userName, permissions = [] }: {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-3 py-6">Loading pharmacy requests…</td></tr>
+                <tr><td colSpan={9} className="px-3 py-6">Loading pharmacy requests…</td></tr>
               ) : visible.length === 0 ? (
-                <tr><td colSpan={8} className="px-3 py-6">No matching procedure rows.</td></tr>
+                <tr><td colSpan={9} className="px-3 py-6">No matching procedure rows.</td></tr>
               ) : visible.map(line => (
                 <tr key={line.key} className="border-t border-outline-variant">
                   <td className="px-3 py-2">

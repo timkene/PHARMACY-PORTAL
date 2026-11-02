@@ -24,22 +24,30 @@ function order(id: string, meds: Order['medications'], extra: Partial<Order> = {
     medications: meds,
     status: 'completed',
     bids: [],
+    winnerId: extra.winnerId ?? 'agg-a',
+    winnerName: extra.winnerName ?? 'Pharmacy Hub A',
     createdAt: extra.createdAt ?? '2026-10-15T08:00:00.000Z',
     ...extra,
   }
 }
 
-const med = (name: string, code?: string): Order['medications'][number] => ({
+const med = (name: string, code?: string, quantity = 1): Order['medications'][number] => ({
   lineId: name, name, procedureCode: code, diagnosis: 'Hypertension', diagnosisCode: 'I10',
-  dosage: '1', quantity: 1, tablets: 1, frequency: 'every 24 hrs', durationDays: 1,
+  dosage: '1', quantity, tablets: 1, frequency: 'every 24 hrs', durationDays: 1,
 })
 
 describe('PaRequestExportTable', () => {
   beforeEach(() => {
     loadOrdersForPaExport.mockReset()
     loadOrdersForPaExport.mockResolvedValue([
-      order('one', [med('Drug A', 'DRG-A'), med('Drug B', 'DRG-B')]),
-      order('two', [med('Drug C', 'DRG-C')], { enrollee: { enrolleeId: '000999', fullName: 'Other' }, provider: { providerId: '8800', providerName: 'Clinic B' }, createdAt: '2026-09-01T00:00:00.000Z' }),
+      order('one', [med('Drug A', 'DRG-A', 10), med('Drug B', 'DRG-B', 20)]),
+      order('two', [med('Drug C', 'DRG-C', 5)], {
+        enrollee: { enrolleeId: '000999', fullName: 'Other' },
+        provider: { providerId: '8800', providerName: 'Clinic B' },
+        winnerId: 'agg-b',
+        winnerName: 'Pharmacy Hub B',
+        createdAt: '2026-09-01T00:00:00.000Z',
+      }),
     ])
   })
 
@@ -47,9 +55,13 @@ describe('PaRequestExportTable', () => {
     render(<PaRequestExportTable userName="Staff" />)
     expect(await screen.findByText('Drug A')).toBeInTheDocument()
     expect(EXPORT_COLUMNS).toEqual([
-      'Enrollee ID', 'Procedure Name', 'Procedure Code', 'Diagnosis Name', 'Diagnosis Code', 'Provider ID', 'Provider Name',
+      'Enrollee ID', 'Procedure Name', 'Procedure Code', 'Quantity', 'Diagnosis Name', 'Diagnosis Code', 'Aggregator ID', 'Aggregator Name',
     ])
     for (const column of EXPORT_COLUMNS) expect(screen.getByRole('columnheader', { name: column })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Provider ID' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Provider Name' })).not.toBeInTheDocument()
+    expect(screen.getByText('10')).toBeInTheDocument()
+    expect(screen.getAllByText('Pharmacy Hub A')).toHaveLength(2)
     expect(screen.getByText('Drug B')).toBeInTheDocument()
     expect(screen.getByText('Drug C')).toBeInTheDocument()
     expect(screen.getByText(/2 requests · 3 procedure rows/)).toBeInTheDocument()
