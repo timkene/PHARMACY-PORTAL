@@ -204,7 +204,7 @@ export const getAggregators = () =>
 export async function loadOrdersForPaExport(): Promise<Order[]> {
   const listed = await getAllStaffOrders()
   const [aggregators, detailed] = await Promise.all([
-    getAggregators().catch(() => []),
+    getAggregators(),
     Promise.all(listed.map(async order => {
       if (order.provider?.providerId && order.provider?.providerName && order.winnerId) return order
       try {
@@ -227,11 +227,18 @@ export async function loadOrdersForPaExport(): Promise<Order[]> {
       .filter(row => row.id)
       .map(row => [row.id, row] as const),
   )
-  return detailed.map(order => ({
-    ...order,
-    winnerName: order.winnerId ? (aggregatorsById.get(order.winnerId)?.companyName ?? '') : '',
-    aggregatorMedicloudProviderId: order.winnerId ? (aggregatorsById.get(order.winnerId)?.medicloudProviderId ?? '') : '',
-  }))
+  return detailed.map(order => {
+    if (!order.winnerId) {
+      return { ...order, winnerName: '', aggregatorMedicloudProviderId: '' }
+    }
+
+    const aggregator = aggregatorsById.get(order.winnerId)
+    return {
+      ...order,
+      winnerName: aggregator?.companyName ?? '',
+      aggregatorMedicloudProviderId: aggregator?.medicloudProviderId ?? '',
+    }
+  })
 }
 
 export const deleteOrder = (id: string) =>
