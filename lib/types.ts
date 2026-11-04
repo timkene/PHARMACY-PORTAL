@@ -95,6 +95,8 @@ export interface Order {
   bids: Bid[]
   winnerId?: string
   winnerName?: string
+  /** Resolved only for the staff PA export; winnerId remains the internal assignment id. */
+  aggregatorMedicloudProviderId?: string
   assignmentType?: 'direct' | 'competitive'
   version?: number
   assignmentVersion?: number
@@ -132,11 +134,28 @@ export interface StaffUser {
 }
 
 export interface AggregatorUser {
-  id: string
-  companyName: string
-  contactName: string
-  email: string
-  phone: string
+  id?: string
+  companyName?: string
+  contactName?: string
+  email?: string
+  phone?: string
+  name?: string
+  mustChangePassword?: boolean
+  emailVerified?: boolean
+  hasEmail?: boolean
+  medicloudProviderId?: string | null
+}
+
+export interface AggregatorOnboarding {
+  userId?: string
+  companyName?: string | null
+  user?: AggregatorUser
+  name?: string
+  email?: string | null
+  mustChangePassword: boolean
+  emailVerified: boolean
+  hasEmail: boolean
+  medicloudProviderId?: string | null
 }
 
 export interface DashboardStats {

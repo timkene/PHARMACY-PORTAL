@@ -28,6 +28,12 @@ vi.mock('@/lib/api', () => {
   }
   return {
     getAggregatorDashboard: (...args: unknown[]) => mockGetAggregatorDashboard(...args),
+    getAggregatorMe: () => Promise.resolve({
+      mustChangePassword: false,
+      hasEmail: true,
+      emailVerified: true,
+      companyName: 'Pharmacy',
+    }),
     ApiError,
   }
 })
@@ -128,12 +134,11 @@ describe('AggregatorDashboardPage', () => {
     vi.clearAllMocks()
   })
 
-  it('shows 2 skeleton placeholders while loading', () => {
+  it('shows 2 skeleton placeholders while loading', async () => {
     // Never resolves during this test — stays in loading state
     mockGetAggregatorDashboard.mockReturnValue(new Promise(() => {}))
     render(<AggregatorDashboardPage />)
-    const skeletons = document.querySelectorAll('.animate-pulse')
-    expect(skeletons.length).toBe(2)
+    await waitFor(() => expect(document.querySelectorAll('.animate-pulse').length).toBe(2))
   })
 
   it('calls getAggregatorDashboard on mount', async () => {

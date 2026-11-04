@@ -96,6 +96,23 @@ describe('direct assignment API contract', () => {
     document.cookie = 'aggregator_session=; path=/; max-age=0'
   })
 
+  it.each([
+    ['benson pharmacy', { username: 'benson pharmacy', password: 'secret' }],
+    ['benson@example.test', { email: 'benson@example.test', password: 'secret' }],
+  ])('sends the %s aggregator login identifier under the matching backend field', async (identifier, body) => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ user: {}, session: 'opaque' }) } as Response)
+    const { aggregatorLogin } = await import('../api')
+    await aggregatorLogin(identifier, 'secret')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST', body: JSON.stringify(body) })
+  })
+
+  it('sends forgot-password identifier under the backend contract field', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ success: true }) } as Response)
+    const { forgotAggregatorPassword } = await import('../api')
+    await forgotAggregatorPassword('benson@example.test')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST', body: JSON.stringify({ identifier: 'benson@example.test' }) })
+  })
+
   it('does not expose server internals', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 500, json: async () => ({ detail: 'Secret stack trace' }) } as Response)
     const { getOrder } = await import('../api')

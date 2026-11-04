@@ -92,7 +92,7 @@ describe('loadOrdersForPaExport', () => {
         return {
           ok: true,
           json: async () => ([
-            { id: '00agg9', companyName: 'Assigned Pharmacy Hub', contactName: 'A', email: 'hub@example.test' },
+            { id: '00agg9', companyName: 'Assigned Pharmacy Hub', medicloudProviderId: '22342', contactName: 'A', email: 'hub@example.test' },
             { id: 'other', companyName: 'Other Hub', contactName: 'B', email: 'other@example.test' },
           ]),
         } as Response
@@ -109,6 +109,7 @@ describe('loadOrdersForPaExport', () => {
     ]))
     expect(orders[0].winnerId).toBe('00agg9')
     expect(orders[0].winnerName).toBe('Assigned Pharmacy Hub')
+    expect(orders[0].aggregatorMedicloudProviderId).toBe('22342')
     expect(orders[0].provider).toEqual({ providerId: '04304', providerName: 'Referring Hospital' })
     expect(orders[0].medications[0].quantity).toBe(14)
   })

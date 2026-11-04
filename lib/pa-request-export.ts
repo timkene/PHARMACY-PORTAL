@@ -54,8 +54,8 @@ export function lineCells(order: Order, medication: Medication): ExportCells {
     'Quantity': quantityText(medication.quantity),
     'Diagnosis Name': text(medication.diagnosis),
     'Diagnosis Code': text(medication.diagnosisCode).trim(),
-    'Aggregator ID': text(order.winnerId),
-    'Aggregator Name': text(order.winnerName),
+    'Aggregator ID': order.winnerId ? text(order.aggregatorMedicloudProviderId) : '',
+    'Aggregator Name': order.winnerId ? text(order.winnerName) : '',
   }
 }
 

@@ -37,6 +37,7 @@ function order(overrides: Partial<Order> = {}): Order {
     bids: [],
     winnerId: 'agg-001',
     winnerName: 'Clearline Pharmacy Hub',
+    aggregatorMedicloudProviderId: '22342',
     createdAt: '2026-10-01T10:00:00.000Z',
     ...overrides,
   }
@@ -88,7 +89,7 @@ describe('PA request export rows', () => {
     expect(rows.map(row => row.cells['Procedure Code'])).toEqual(['DRG-A', 'DRG-B'])
     expect(rows.map(row => row.cells['Quantity'])).toEqual(['10', '20'])
     expect(rows.every(row => row.cells['Enrollee ID'] === '00012345')).toBe(true)
-    expect(rows.every(row => row.cells['Aggregator ID'] === 'agg-001')).toBe(true)
+    expect(rows.every(row => row.cells['Aggregator ID'] === '22342')).toBe(true)
     expect(rows.every(row => row.cells['Aggregator Name'] === 'Clearline Pharmacy Hub')).toBe(true)
     expect(rows.some(row => Object.keys(row.cells).includes('Provider ID'))).toBe(false)
     expect(rows.some(row => Object.keys(row.cells).includes('Provider Name'))).toBe(false)
@@ -99,6 +100,7 @@ describe('PA request export rows', () => {
       provider: { providerId: '04304', providerName: 'Referring Hospital' },
       winnerId: '00agg9',
       winnerName: 'Assigned Pharmacy',
+      aggregatorMedicloudProviderId: '5770',
       medications: [medication({ quantity: 90, tablets: 2 })],
     })
     const [row] = flattenOrder(api)
@@ -109,7 +111,7 @@ describe('PA request export rows', () => {
       'Quantity': '90',
       'Diagnosis Name': api.medications[0].diagnosis,
       'Diagnosis Code': api.medications[0].diagnosisCode,
-      'Aggregator ID': '00agg9',
+      'Aggregator ID': '5770',
       'Aggregator Name': 'Assigned Pharmacy',
     })
     expect(row.cells['Aggregator ID']).not.toBe(api.provider?.providerId)
@@ -138,6 +140,11 @@ describe('PA request export rows', () => {
     expect(row.cells['Quantity']).toBe('')
     expect(row.cells['Aggregator ID']).toBe('')
     expect(row.cells['Aggregator Name']).toBe('')
+  })
+
+  it.each(['22342', '5770', '5505', '21483', '5361'])('exports assigned Aggregator ID %s from medicloudProviderId', medicloudProviderId => {
+    const [row] = flattenOrder(order({ aggregatorMedicloudProviderId: medicloudProviderId }))
+    expect(row.cells['Aggregator ID']).toBe(medicloudProviderId)
   })
 
   it('filters by date, provider, and enrollee without dropping leading zeros', () => {
@@ -182,6 +189,7 @@ describe('PA request export files', () => {
       enrollee: { enrolleeId: '00012345', fullName: 'Synthetic' },
       winnerId: '00agg1',
       winnerName: '=Pharmacy()',
+      aggregatorMedicloudProviderId: '5505',
       medications: [medication({
         lineId: 'a', name: '=SUM(1)', procedureCode: '+CMD', diagnosis: '@Danger', diagnosisCode: '-I10', quantity: 7,
       })],
@@ -189,7 +197,7 @@ describe('PA request export files', () => {
     const table = parseCsv(toCsv(rows))
     expect(table[0]).toEqual([...EXPORT_COLUMNS])
     expect(table[1]).toEqual([
-      '00012345', "'=SUM(1)", "'+CMD", '7', "'@Danger", "'-I10", '00agg1', "'=Pharmacy()",
+      '00012345', "'=SUM(1)", "'+CMD", '7', "'@Danger", "'-I10", '5505', "'=Pharmacy()",
     ])
     expect(toCsv(rows)).not.toContain('Synthetic Clinic')
     expect(toCsv(rows)).not.toContain('04304')
@@ -206,7 +214,7 @@ describe('PA request export files', () => {
     expect(xml).not.toContain('Provider Name')
     expect(xml).toContain('00012345')
     expect(xml).toContain('30')
-    expect(xml).toContain('agg-001')
+    expect(xml).toContain('22342')
     expect(xml).toContain('Clearline Pharmacy Hub')
     expect(xml).toContain('t="inlineStr"')
   })

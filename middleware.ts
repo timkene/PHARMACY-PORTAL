@@ -6,6 +6,9 @@ const PUBLIC_PATHS = [
   '/staff/login',
   '/aggregator/login',
   '/aggregator/signup',
+  '/aggregator/forgot-password',
+  '/aggregator/reset-password',
+  '/aggregator/verify-email',
 ]
 
 export function middleware(request: NextRequest) {

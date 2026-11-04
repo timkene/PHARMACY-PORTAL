@@ -14,6 +14,8 @@ vi.mock('next/navigation', () => ({
 const mockLogout = vi.fn()
 const mockAggregatorSignup = vi.fn()
 const mockAggregatorLogin = vi.fn()
+const mockGetAggregatorMe = vi.fn()
+const mockForgotAggregatorPassword = vi.fn()
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
@@ -28,6 +30,8 @@ vi.mock('@/lib/api', () => {
     logout: (...args: unknown[]) => mockLogout(...args),
     aggregatorSignup: (...args: unknown[]) => mockAggregatorSignup(...args),
     aggregatorLogin: (...args: unknown[]) => mockAggregatorLogin(...args),
+    getAggregatorMe: (...args: unknown[]) => mockGetAggregatorMe(...args),
+    forgotAggregatorPassword: (...args: unknown[]) => mockForgotAggregatorPassword(...args),
     ApiError,
   }
 })
@@ -36,6 +40,7 @@ vi.mock('@/lib/api', () => {
 import { AggregatorShell } from '@/components/aggregator/AggregatorShell'
 import AggregatorSignupPage from '@/app/aggregator/signup/page'
 import AggregatorLoginPage from '@/app/aggregator/login/page'
+import ForgotPasswordPage from '@/app/aggregator/forgot-password/page'
 import { ApiError } from '@/lib/api'
 
 // -------------------------
@@ -44,6 +49,7 @@ import { ApiError } from '@/lib/api'
 describe('AggregatorShell', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockGetAggregatorMe.mockResolvedValue({ mustChangePassword: false, hasEmail: true, emailVerified: true })
     mockPathname.mockReturnValue('/aggregator/dashboard')
   })
 
@@ -181,11 +187,12 @@ describe('AggregatorSignupPage', () => {
 describe('AggregatorLoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockGetAggregatorMe.mockResolvedValue({ mustChangePassword: false, hasEmail: true, emailVerified: true })
   })
 
-  it('renders email and password inputs', () => {
+  it('renders username/email and password inputs', () => {
     render(<AggregatorLoginPage />)
-    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/username or email address/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
   })
 
@@ -193,7 +200,7 @@ describe('AggregatorLoginPage', () => {
     mockAggregatorLogin.mockResolvedValue({ user: { id: '1' } })
     render(<AggregatorLoginPage />)
 
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'user@test.com' } })
+    fireEvent.change(screen.getByLabelText(/username or email address/i), { target: { value: 'user@test.com' } })
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'mypassword' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
@@ -206,7 +213,7 @@ describe('AggregatorLoginPage', () => {
     mockAggregatorLogin.mockResolvedValue({ user: { id: '1' } })
     render(<AggregatorLoginPage />)
 
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'user@test.com' } })
+    fireEvent.change(screen.getByLabelText(/username or email address/i), { target: { value: 'user@test.com' } })
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'mypassword' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
@@ -219,7 +226,7 @@ describe('AggregatorLoginPage', () => {
     mockAggregatorLogin.mockRejectedValue(new ApiError(401, 'Unauthorized'))
     render(<AggregatorLoginPage />)
 
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'user@test.com' } })
+    fireEvent.change(screen.getByLabelText(/username or email address/i), { target: { value: 'user@test.com' } })
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrongpass' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
@@ -232,12 +239,37 @@ describe('AggregatorLoginPage', () => {
     mockAggregatorLogin.mockRejectedValue(new Error('Network error'))
     render(<AggregatorLoginPage />)
 
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'user@test.com' } })
+    fireEvent.change(screen.getByLabelText(/username or email address/i), { target: { value: 'user@test.com' } })
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'mypassword' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong')
     })
+  })
+
+  it.each([
+    [{ mustChangePassword: true, hasEmail: true, emailVerified: true }, '/aggregator/setup/password'],
+    [{ mustChangePassword: false, hasEmail: false, emailVerified: false }, '/aggregator/setup/email'],
+    [{ mustChangePassword: false, hasEmail: true, emailVerified: true }, '/aggregator/dashboard'],
+  ])('routes after login according to onboarding state', async (flags, destination) => {
+    mockAggregatorLogin.mockResolvedValue({ user: { id: '1' } })
+    mockGetAggregatorMe.mockResolvedValue(flags)
+    render(<AggregatorLoginPage />)
+    fireEvent.change(screen.getByLabelText(/username or email address/i), { target: { value: 'benson pharmacy' } })
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'mypassword' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(destination))
+  })
+})
+
+describe('ForgotPasswordPage', () => {
+  it('shows generic success copy after submission', async () => {
+    mockForgotAggregatorPassword.mockResolvedValue({ success: true })
+    render(<ForgotPasswordPage />)
+    fireEvent.change(screen.getByPlaceholderText('benson pharmacy'), { target: { value: 'benson pharmacy' } })
+    fireEvent.click(screen.getByRole('button', { name: /send reset instructions/i }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('If an account matches, you’ll receive reset instructions shortly.'))
+    expect(mockForgotAggregatorPassword).toHaveBeenCalledWith('benson pharmacy')
   })
 })
