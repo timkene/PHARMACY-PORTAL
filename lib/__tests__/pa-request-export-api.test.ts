@@ -114,6 +114,103 @@ describe('loadOrdersForPaExport', () => {
     expect(orders[0].medications[0].quantity).toBe(14)
   })
 
+  it('propagates aggregator list failures so export cannot proceed', async () => {
+    process.env.NEXT_PUBLIC_API_URL = 'http://test.local'
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/orders?page=1&limit=100')) {
+        return {
+          ok: true,
+          json: async () => ({ orders: [], total: 0, page: 1 }),
+        } as Response
+      }
+      if (url.endsWith('/api/aggregators')) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ message: 'upstream failure' }),
+        } as Response
+      }
+      throw new Error(`unexpected ${url}`)
+    })
+
+    const { ApiError, loadOrdersForPaExport } = await import('../api')
+    await expect(loadOrdersForPaExport()).rejects.toMatchObject({
+      status: 503,
+      name: 'ApiError',
+    } satisfies Partial<InstanceType<typeof ApiError>>)
+  })
+
+  it('keeps assigned Aggregator ID blank without using winnerId or the hospital provider', async () => {
+    process.env.NEXT_PUBLIC_API_URL = 'http://test.local'
+    const listPage = {
+      ok: true,
+      json: async () => ({
+        orders: [{
+          id: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+          enrollee: { enrolleeId: '0001', fullName: 'A' },
+          provider: { providerId: '04304', providerName: 'Referring Hospital' },
+          medications: [{ name: 'Drug', diagnosis: 'I10', dosage: '1', quantity: 1, tablets: 1, frequency: 'every 24 hrs', durationDays: 1 }],
+          status: 'completed',
+          winnerId: 'agg-without-provider-id',
+          createdAt: '2026-10-01T00:00:00.000Z',
+        }],
+        total: 1,
+        page: 1,
+      }),
+    }
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/orders?page=1&limit=100')) return listPage as Response
+      if (url.endsWith('/api/aggregators')) {
+        return {
+          ok: true,
+          json: async () => [{ id: 'agg-without-provider-id', companyName: 'Known Aggregator' }],
+        } as Response
+      }
+      throw new Error(`unexpected ${url}`)
+    })
+
+    const { loadOrdersForPaExport } = await import('../api')
+    const [order] = await loadOrdersForPaExport()
+    expect(order.winnerName).toBe('Known Aggregator')
+    expect(order.aggregatorMedicloudProviderId).toBe('')
+    expect(order.winnerId).toBe('agg-without-provider-id')
+    expect(order.provider).toEqual({ providerId: '04304', providerName: 'Referring Hospital' })
+  })
+
+  it('keeps unassigned aggregator columns blank', async () => {
+    process.env.NEXT_PUBLIC_API_URL = 'http://test.local'
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/orders?page=1&limit=100')) {
+        return {
+          ok: true,
+          json: async () => ({
+            orders: [{
+              id: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+              enrollee: { enrolleeId: '0001', fullName: 'A' },
+              provider: { providerId: '04304', providerName: 'Referring Hospital' },
+              medications: [],
+              status: 'completed',
+              createdAt: '2026-10-01T00:00:00.000Z',
+            }],
+            total: 1,
+            page: 1,
+          }),
+        } as Response
+      }
+      if (url.endsWith('/api/aggregators')) return { ok: true, json: async () => [] } as Response
+      throw new Error(`unexpected ${url}`)
+    })
+
+    const { loadOrdersForPaExport } = await import('../api')
+    const [order] = await loadOrdersForPaExport()
+    expect(order.winnerId).toBeUndefined()
+    expect(order.winnerName).toBe('')
+    expect(order.aggregatorMedicloudProviderId).toBe('')
+  })
+
   it('loads every order across paginated GET /api/orders responses', async () => {
     process.env.NEXT_PUBLIC_API_URL = 'http://test.local'
     const page = (orders: { id: string }[], total: number, pageNumber: number) => ({

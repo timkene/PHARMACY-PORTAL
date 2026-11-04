@@ -36,6 +36,7 @@ export function PaRequestExportTable({ userName, permissions = [] }: {
   const [lines, setLines] = useState<ExportLine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filters, setFilters] = useState<ExportFilters>({ from: '', to: '', provider: '', enrollee: '' })
@@ -43,9 +44,17 @@ export function PaRequestExportTable({ userName, permissions = [] }: {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setWarning(null)
+    setLines([])
     try {
       const orders = await loadOrdersForPaExport()
-      setLines(flattenOrders(orders))
+      const flattened = flattenOrders(orders)
+      setLines(flattened)
+      const unnamed = flattened.filter(line => line.cells['Aggregator Name'] && !line.cells['Aggregator ID'])
+      if (unnamed.length) {
+        const names = [...new Set(unnamed.map(line => line.cells['Aggregator Name']))]
+        setWarning(`Aggregator ID is blank for ${names.join(', ')} because no MediCloud provider ID is on file.`)
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to load pharmacy requests.')
     } finally {
@@ -122,6 +131,8 @@ export function PaRequestExportTable({ userName, permissions = [] }: {
           </button>
         </div>
         {error ? <p role="alert" className="text-error mb-4">{error}</p> : null}
+        {warning ? <p role="status" className="text-on-surface-variant mb-4">{warning}</p> : null}
+        {warning ? <p role="status" className="text-on-surface-variant mb-4">{warning}</p> : null}
         <div className="overflow-x-auto border border-outline-variant rounded">
           <table className="min-w-full text-body-sm">
             <thead className="bg-surface-container">
