@@ -4,10 +4,11 @@ export const EXPORT_COLUMNS = [
   'Enrollee ID',
   'Procedure Name',
   'Procedure Code',
+  'Quantity',
   'Diagnosis Name',
   'Diagnosis Code',
-  'Provider ID',
-  'Provider Name',
+  'Aggregator ID',
+  'Aggregator Name',
 ] as const
 
 export type ExportColumn = typeof EXPORT_COLUMNS[number]
@@ -40,15 +41,21 @@ function formulaSafe(value: string): string {
   return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
 }
 
+function quantityText(value: unknown): string {
+  if (value == null || value === '') return ''
+  return String(value)
+}
+
 export function lineCells(order: Order, medication: Medication): ExportCells {
   return {
     'Enrollee ID': text(order.enrollee?.enrolleeId),
     'Procedure Name': text(medication.name),
     'Procedure Code': text(medication.procedureCode).trim(),
+    'Quantity': quantityText(medication.quantity),
     'Diagnosis Name': text(medication.diagnosis),
     'Diagnosis Code': text(medication.diagnosisCode).trim(),
-    'Provider ID': text(order.provider?.providerId),
-    'Provider Name': text(order.provider?.providerName),
+    'Aggregator ID': order.winnerId ? text(order.aggregatorMedicloudProviderId) : '',
+    'Aggregator Name': order.winnerId ? text(order.winnerName) : '',
   }
 }
 
@@ -61,8 +68,8 @@ export function flattenOrder(order: Order): ExportLine[] {
       orderId: order.id,
       createdAt: order.createdAt,
       enrolleeId: cells['Enrollee ID'],
-      providerId: cells['Provider ID'],
-      providerName: cells['Provider Name'],
+      providerId: text(order.provider?.providerId),
+      providerName: text(order.provider?.providerName),
       cells,
     }
   })

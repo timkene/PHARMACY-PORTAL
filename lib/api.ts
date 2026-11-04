@@ -16,6 +16,7 @@ import type {
   Provider,
   AggregatorDashboard,
   AggregatorOrdersResponse,
+  AggregatorOnboarding,
   SearchResult,
 } from './types'
 
@@ -99,14 +100,52 @@ export const staffLogin = async (email: string, password: string) => {
   return data
 }
 
-export const aggregatorLogin = async (email: string, password: string) => {
+export const aggregatorLogin = async (identifier: string, password: string) => {
+  const key = identifier.includes('@') ? 'email' : 'username'
   const data = await apiFetch<{ user: AggregatorUser; session: string }>('/api/auth/aggregator/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ [key]: identifier, password }),
   })
   setDomainCookie('aggregator_session', data.session)
   return data
 }
+
+export const getAggregatorMe = async () => {
+  const data = await apiFetch<AggregatorOnboarding>('/api/auth/aggregator/me', { cache: 'no-store' })
+  const user = data.user ?? data
+  return {
+    ...data,
+    ...user,
+    mustChangePassword: data.mustChangePassword ?? user.mustChangePassword ?? false,
+    hasEmail: data.hasEmail ?? user.hasEmail ?? !!(data.email ?? user.email),
+    emailVerified: data.emailVerified ?? user.emailVerified ?? false,
+  }
+}
+
+export const changeAggregatorPassword = (currentPassword: string, newPassword: string) =>
+  apiFetch<{ success: boolean }>('/api/auth/aggregator/change-password', {
+    method: 'POST', body: JSON.stringify({ currentPassword, newPassword }),
+  })
+
+export const setAggregatorEmail = (email: string) =>
+  apiFetch<{ success: boolean }>('/api/auth/aggregator/email', {
+    method: 'POST', body: JSON.stringify({ email }),
+  })
+
+export const verifyAggregatorEmail = (token: string) =>
+  apiFetch<{ success: boolean }>('/api/auth/aggregator/email/verify', {
+    method: 'POST', body: JSON.stringify({ token }),
+  })
+
+export const forgotAggregatorPassword = (identifier: string) =>
+  apiFetch<{ success: boolean }>('/api/auth/aggregator/forgot-password', {
+    method: 'POST', body: JSON.stringify({ identifier }),
+  })
+
+export const resetAggregatorPassword = (token: string, newPassword: string) =>
+  apiFetch<{ success: boolean }>('/api/auth/aggregator/reset-password', {
+    method: 'POST', body: JSON.stringify({ token, newPassword }),
+  })
 
 export const aggregatorSignup = async (payload: {
   companyName: string
@@ -159,23 +198,40 @@ export async function getAllStaffOrders(): Promise<Order[]> {
   return orders
 }
 
+export const getAggregators = () =>
+  apiFetch<Array<{ id: string; companyName?: string | null; medicloudProviderId?: string | null }>>('/api/aggregators')
+
 export async function loadOrdersForPaExport(): Promise<Order[]> {
   const listed = await getAllStaffOrders()
-  const detailed = await Promise.all(listed.map(async order => {
-    if (order.provider?.providerId && order.provider?.providerName) return order
-    try {
-      const { order: detail } = await getOrder(order.id)
-      return {
-        ...order,
-        ...detail,
-        medications: (detail.medications?.length ? detail.medications : order.medications) ?? [],
-        provider: detail.provider ?? order.provider,
+  const [aggregators, detailed] = await Promise.all([
+    getAggregators().catch(() => []),
+    Promise.all(listed.map(async order => {
+      if (order.provider?.providerId && order.provider?.providerName && order.winnerId) return order
+      try {
+        const { order: detail } = await getOrder(order.id)
+        return {
+          ...order,
+          ...detail,
+          medications: (detail.medications?.length ? detail.medications : order.medications) ?? [],
+          provider: detail.provider ?? order.provider,
+          winnerId: detail.winnerId ?? order.winnerId,
+          winnerName: detail.winnerName,
+        }
+      } catch {
+        return order
       }
-    } catch {
-      return order
-    }
+    })),
+  ])
+  const aggregatorsById = new Map(
+    aggregators
+      .filter(row => row.id)
+      .map(row => [row.id, row] as const),
+  )
+  return detailed.map(order => ({
+    ...order,
+    winnerName: order.winnerId ? (aggregatorsById.get(order.winnerId)?.companyName ?? '') : '',
+    aggregatorMedicloudProviderId: order.winnerId ? (aggregatorsById.get(order.winnerId)?.medicloudProviderId ?? '') : '',
   }))
-  return detailed
 }
 
 export const deleteOrder = (id: string) =>

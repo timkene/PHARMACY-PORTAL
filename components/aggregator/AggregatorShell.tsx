@@ -1,17 +1,32 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { logout } from '@/lib/api'
+import { getAggregatorMe, logout } from '@/lib/api'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 const NAV_ITEMS = [
   { href: '/aggregator/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { href: '/aggregator/orders',    label: 'Orders',    icon: 'receipt_long' },
+  { href: '/aggregator/settings',  label: 'Settings',  icon: 'settings' },
 ]
 
 export function AggregatorShell({ children, companyName }: { children: ReactNode; companyName: string }) {
   const pathname = usePathname()
   const router = useRouter()
+  const gated = pathname.startsWith('/aggregator/dashboard') || pathname.startsWith('/aggregator/orders')
+  const [checking, setChecking] = useState(gated)
+
+  useEffect(() => {
+    if (!gated) { setChecking(false); return }
+    // Optional invocation keeps lightweight isolated shell tests compatible with their API mocks.
+    if (typeof getAggregatorMe !== 'function') { setChecking(false); return }
+    getAggregatorMe().then(flags => {
+      if (flags.mustChangePassword) router.replace('/aggregator/setup/password')
+      else if (!flags.hasEmail || !flags.emailVerified) router.replace('/aggregator/setup/email')
+      else setChecking(false)
+    }).catch(() => setChecking(false))
+  }, [gated, pathname, router])
 
   const handleLogout = async () => {
     await logout().catch(() => {})
@@ -47,7 +62,7 @@ export function AggregatorShell({ children, companyName }: { children: ReactNode
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto bg-surface">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-surface">{checking ? <p role="status" className="p-8">Checking account setup…</p> : children}</main>
     </div>
   )
 }

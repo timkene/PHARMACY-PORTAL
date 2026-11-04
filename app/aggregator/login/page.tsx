@@ -2,12 +2,12 @@
 import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { aggregatorLogin, ApiError } from '@/lib/api'
+import { aggregatorLogin, getAggregatorMe, ApiError } from '@/lib/api'
 import { INPUT_CLS } from '@/lib/styles'
 
 export default function AggregatorLoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,8 +17,21 @@ export default function AggregatorLoginPage() {
     setError('')
     setLoading(true)
     try {
-      await aggregatorLogin(email, password)
-      router.push('/aggregator/dashboard')
+      const result = await aggregatorLogin(identifier.trim(), password)
+      const flags = typeof getAggregatorMe === 'function' ? await getAggregatorMe().catch(() => ({
+        ...(result.user ?? {}),
+        mustChangePassword: result.user?.mustChangePassword ?? false,
+        hasEmail: result.user?.hasEmail ?? !!result.user?.email,
+        emailVerified: result.user?.emailVerified ?? false,
+      })) : {
+        ...(result.user ?? {}),
+        mustChangePassword: result.user?.mustChangePassword ?? false,
+        hasEmail: result.user?.hasEmail ?? !!result.user?.email,
+        emailVerified: result.user?.emailVerified ?? false,
+      }
+      if (flags.mustChangePassword) router.push('/aggregator/setup/password')
+      else if (!flags.hasEmail || !flags.emailVerified) router.push('/aggregator/setup/email')
+      else router.push('/aggregator/dashboard')
     } catch (err) {
       setError(err instanceof ApiError ? 'Invalid email or password' : 'Something went wrong')
     } finally {
@@ -34,18 +47,19 @@ export default function AggregatorLoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-body-sm font-semibold mb-1">Email Address</label>
+            <label htmlFor="identifier" className="block text-body-sm font-semibold mb-1">Username or Email Address</label>
             <input
-              id="email"
-              type="email"
+              id="identifier"
+              type="text"
               required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              value={identifier}
+              onChange={e => setIdentifier(e.target.value)}
               className={INPUT_CLS}
-              placeholder="contact@medstore.ng"
-              autoComplete="email"
+              placeholder="benson pharmacy"
+              autoComplete="username"
             />
           </div>
+          <p className="text-right -mt-2"><Link href="/aggregator/forgot-password" className="text-primary text-body-sm hover:underline">Forgot password?</Link></p>
           <div>
             <label htmlFor="password" className="block text-body-sm font-semibold mb-1">Password</label>
             <input

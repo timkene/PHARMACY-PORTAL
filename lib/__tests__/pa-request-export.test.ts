@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Order } from '../types'
+import type { Medication, Order } from '../types'
 import {
   EXPORT_COLUMNS,
   filterExportLines,
@@ -10,26 +10,34 @@ import {
   toXlsx,
 } from '../pa-request-export'
 
+function medication(overrides: Partial<Medication> = {}): Medication {
+  return {
+    lineId: 'line-a',
+    name: 'Amlodipine 10mg',
+    procedureCode: 'DRG-001',
+    diagnosis: 'Hypertension',
+    diagnosisCode: 'I10',
+    dosage: '1',
+    quantity: 30,
+    tablets: 1,
+    frequency: 'every 24 hrs',
+    durationDays: 30,
+    ...overrides,
+  }
+}
+
 function order(overrides: Partial<Order> = {}): Order {
   return {
     id: 'aaaaaaaaaaaaaaaaaaaaaaaa',
     intakeId: 'INT-1',
     enrollee: { enrolleeId: '00012345', fullName: 'Synthetic Member' },
     provider: { providerId: '04304', providerName: 'Synthetic Clinic' },
-    medications: [{
-      lineId: 'line-a',
-      name: 'Amlodipine 10mg',
-      procedureCode: 'DRG-001',
-      diagnosis: 'Hypertension',
-      diagnosisCode: 'I10',
-      dosage: '1',
-      quantity: 30,
-      tablets: 1,
-      frequency: 'every 24 hrs',
-      durationDays: 30,
-    }],
+    medications: [medication()],
     status: 'completed',
     bids: [],
+    winnerId: 'agg-001',
+    winnerName: 'Clearline Pharmacy Hub',
+    aggregatorMedicloudProviderId: '22342',
     createdAt: '2026-10-01T10:00:00.000Z',
     ...overrides,
   }
@@ -57,48 +65,86 @@ function parseCsv(csv: string): string[][] {
 }
 
 describe('PA request export rows', () => {
-  it('uses one row per medication and repeats enrollee and provider fields', () => {
+  it('uses the eight confirmed columns in order', () => {
+    expect(EXPORT_COLUMNS).toEqual([
+      'Enrollee ID',
+      'Procedure Name',
+      'Procedure Code',
+      'Quantity',
+      'Diagnosis Name',
+      'Diagnosis Code',
+      'Aggregator ID',
+      'Aggregator Name',
+    ])
+  })
+
+  it('uses one row per medication and repeats enrollee, diagnosis, and aggregator fields', () => {
     const rows = flattenOrder(order({
       medications: [
-        { lineId: 'a', name: 'Drug A', procedureCode: 'DRG-A', diagnosis: 'Hypertension', diagnosisCode: 'I10', dosage: '1', quantity: 1, tablets: 1, frequency: 'every 24 hrs', durationDays: 1 },
-        { lineId: 'b', name: 'Drug B', procedureCode: 'DRG-B', diagnosis: 'Diabetes', diagnosisCode: 'E11', dosage: '1', quantity: 2, tablets: 1, frequency: 'every 12 hrs', durationDays: 7 },
+        medication({ lineId: 'a', name: 'Drug A', procedureCode: 'DRG-A', quantity: 10, diagnosis: 'Hypertension', diagnosisCode: 'I10' }),
+        medication({ lineId: 'b', name: 'Drug B', procedureCode: 'DRG-B', quantity: 20, diagnosis: 'Diabetes', diagnosisCode: 'E11' }),
       ],
     }))
     expect(rows).toHaveLength(2)
     expect(rows.map(row => row.cells['Procedure Code'])).toEqual(['DRG-A', 'DRG-B'])
+    expect(rows.map(row => row.cells['Quantity'])).toEqual(['10', '20'])
     expect(rows.every(row => row.cells['Enrollee ID'] === '00012345')).toBe(true)
-    expect(rows.every(row => row.cells['Provider ID'] === '04304')).toBe(true)
-    expect(rows.every(row => row.cells['Provider Name'] === 'Synthetic Clinic')).toBe(true)
+    expect(rows.every(row => row.cells['Aggregator ID'] === '22342')).toBe(true)
+    expect(rows.every(row => row.cells['Aggregator Name'] === 'Clearline Pharmacy Hub')).toBe(true)
+    expect(rows.some(row => Object.keys(row.cells).includes('Provider ID'))).toBe(false)
+    expect(rows.some(row => Object.keys(row.cells).includes('Provider Name'))).toBe(false)
   })
 
-  it('leaves missing procedure and diagnosis codes blank and does not substitute', () => {
-    const [row] = flattenOrder(order({
-      diagnosis: 'Should not be used as a code',
-      medications: [{
-        lineId: 'a', name: 'Uncoded drug', diagnosis: 'Known diagnosis', dosage: '1', quantity: 1, tablets: 1, frequency: 'every 24 hrs', durationDays: 1,
-      }],
-    }))
-    expect(row.cells['Procedure Code']).toBe('')
-    expect(row.cells['Diagnosis Code']).toBe('')
-    expect(row.cells['Diagnosis Name']).toBe('Known diagnosis')
-    expect(row.cells['Procedure Name']).toBe('Uncoded drug')
-  })
-
-  it('matches exported cells to the original API order fields', () => {
-    const api = order()
+  it('maps quantity from the medication request and aggregator from the assigned pharmacy, not the hospital', () => {
+    const api = order({
+      provider: { providerId: '04304', providerName: 'Referring Hospital' },
+      winnerId: '00agg9',
+      winnerName: 'Assigned Pharmacy',
+      aggregatorMedicloudProviderId: '5770',
+      medications: [medication({ quantity: 90, tablets: 2 })],
+    })
     const [row] = flattenOrder(api)
     expect(row.cells).toEqual({
       'Enrollee ID': api.enrollee.enrolleeId,
       'Procedure Name': api.medications[0].name,
       'Procedure Code': api.medications[0].procedureCode,
+      'Quantity': '90',
       'Diagnosis Name': api.medications[0].diagnosis,
       'Diagnosis Code': api.medications[0].diagnosisCode,
-      'Provider ID': api.provider?.providerId,
-      'Provider Name': api.provider?.providerName,
+      'Aggregator ID': '5770',
+      'Aggregator Name': 'Assigned Pharmacy',
     })
-    expect(EXPORT_COLUMNS).toEqual([
-      'Enrollee ID', 'Procedure Name', 'Procedure Code', 'Diagnosis Name', 'Diagnosis Code', 'Provider ID', 'Provider Name',
-    ])
+    expect(row.cells['Aggregator ID']).not.toBe(api.provider?.providerId)
+    expect(row.cells['Aggregator Name']).not.toBe(api.provider?.providerName)
+    expect(row.cells['Quantity']).not.toBe('2')
+  })
+
+  it('leaves missing quantity, codes, and aggregator values blank and does not substitute provider data', () => {
+    const [row] = flattenOrder(order({
+      winnerId: undefined,
+      winnerName: undefined,
+      diagnosis: 'Should not be used as a code',
+      medications: [{
+        lineId: 'a',
+        name: 'Uncoded drug',
+        diagnosis: 'Known diagnosis',
+        dosage: '1',
+        tablets: 4,
+        frequency: 'every 24 hrs',
+        durationDays: 1,
+      } as Medication],
+    }))
+    expect(row.cells['Procedure Code']).toBe('')
+    expect(row.cells['Diagnosis Code']).toBe('')
+    expect(row.cells['Diagnosis Name']).toBe('Known diagnosis')
+    expect(row.cells['Quantity']).toBe('')
+    expect(row.cells['Aggregator ID']).toBe('')
+    expect(row.cells['Aggregator Name']).toBe('')
+  })
+
+  it.each(['22342', '5770', '5505', '21483', '5361'])('exports assigned Aggregator ID %s from medicloudProviderId', medicloudProviderId => {
+    const [row] = flattenOrder(order({ aggregatorMedicloudProviderId: medicloudProviderId }))
+    expect(row.cells['Aggregator ID']).toBe(medicloudProviderId)
   })
 
   it('filters by date, provider, and enrollee without dropping leading zeros', () => {
@@ -138,26 +184,38 @@ describe('PA request export rows', () => {
 })
 
 describe('PA request export files', () => {
-  it('writes a seven-column CSV that preserves leading zeros and blocks formula injection', () => {
+  it('writes an eight-column CSV that preserves leading zeros and blocks formula injection', () => {
     const rows = flattenOrder(order({
       enrollee: { enrolleeId: '00012345', fullName: 'Synthetic' },
-      medications: [{
-        lineId: 'a', name: '=SUM(1)', procedureCode: '+CMD', diagnosis: '@Danger', diagnosisCode: '-I10', dosage: '1', quantity: 1, tablets: 1, frequency: 'every 24 hrs', durationDays: 1,
-      }],
+      winnerId: '00agg1',
+      winnerName: '=Pharmacy()',
+      aggregatorMedicloudProviderId: '5505',
+      medications: [medication({
+        lineId: 'a', name: '=SUM(1)', procedureCode: '+CMD', diagnosis: '@Danger', diagnosisCode: '-I10', quantity: 7,
+      })],
     }))
     const table = parseCsv(toCsv(rows))
     expect(table[0]).toEqual([...EXPORT_COLUMNS])
-    expect(table[1]).toEqual(["00012345", "'=SUM(1)", "'+CMD", "'@Danger", "'-I10", "04304", "Synthetic Clinic"])
+    expect(table[1]).toEqual([
+      '00012345', "'=SUM(1)", "'+CMD", '7', "'@Danger", "'-I10", '5505', "'=Pharmacy()",
+    ])
+    expect(toCsv(rows)).not.toContain('Synthetic Clinic')
+    expect(toCsv(rows)).not.toContain('04304')
     expect(toCsv(rows).startsWith('\uFEFF')).toBe(true)
   })
 
-  it('writes an xlsx package containing the same seven columns as text', () => {
+  it('writes an xlsx package containing the same eight columns as text', () => {
     const rows = flattenOrder(order())
     const bytes = toXlsx(rows)
     expect(String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3])).toBe('PK\u0003\u0004')
     const xml = new TextDecoder().decode(bytes)
     for (const column of EXPORT_COLUMNS) expect(xml).toContain(column)
+    expect(xml).not.toContain('Provider ID')
+    expect(xml).not.toContain('Provider Name')
     expect(xml).toContain('00012345')
+    expect(xml).toContain('30')
+    expect(xml).toContain('22342')
+    expect(xml).toContain('Clearline Pharmacy Hub')
     expect(xml).toContain('t="inlineStr"')
   })
 
