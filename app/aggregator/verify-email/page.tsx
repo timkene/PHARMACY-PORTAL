@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { verifyAggregatorEmail, ApiError } from '@/lib/api'
 import { INPUT_CLS } from '@/lib/styles'
-import { SetupCard } from '../setup/password/page'
+import { SetupCard } from '@/components/aggregator/SetupCard'
 
 export default function VerifyEmailPage() {
   const router = useRouter(); const [token, setToken] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false)

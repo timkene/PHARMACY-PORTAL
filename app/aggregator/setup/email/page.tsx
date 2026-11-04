@@ -3,7 +3,7 @@ import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setAggregatorEmail, ApiError } from '@/lib/api'
 import { INPUT_CLS } from '@/lib/styles'
-import { SetupCard } from '../password/page'
+import { SetupCard } from '@/components/aggregator/SetupCard'
 
 export default function AggregatorEmailSetupPage() {
   const router = useRouter(); const [email, setEmail] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false)
